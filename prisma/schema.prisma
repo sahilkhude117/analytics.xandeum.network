@@ -1,0 +1,123 @@
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model PNode {
+  id        String   @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  pubkey        String  @unique @db.VarChar(44) 
+  ipAddress     String  @map("ip_address") @db.VarChar(45) 
+  gossipPort    Int     @default(9001) @map("gossip_port") @db.Integer
+  rpcPort       Int     @default(6000) @map("rpc_port") @db.Integer
+  gossipAddress String? @map("gossip_address") @db.VarChar(100) 
+
+  isPublic Boolean @default(true) @map("is_public")
+  version  String  @default("0.8.0") @db.VarChar(20)
+  status   Status  @default(ONLINE)
+
+  storageCommitted     BigInt @default(0) @map("storage_committed") @db.BigInt
+  storageUsed          BigInt @default(0) @map("storage_used") @db.BigInt
+  storageUsagePercent  Float  @default(0) @map("storage_usage_percent") @db.DoublePrecision
+
+  uptime      Int   @default(0) @db.Integer // seconds
+  cpuPercent  Float @default(0) @map("cpu_percent") @db.DoublePrecision
+  ramUsed     BigInt @default(0) @map("ram_used") @db.BigInt
+  ramTotal    BigInt @default(0) @map("ram_total") @db.BigInt
+  
+  lastSeenTimestamp Int      @map("last_seen_timestamp") @db.Integer
+  lastSeenAt        DateTime @map("last_seen_at") @db.Timestamptz(6)
+  firstSeenAt       DateTime @default(now()) @map("first_seen_at") @db.Timestamptz(6)
+
+  latitude    Float?  @db.DoublePrecision
+  longitude   Float?  @db.DoublePrecision
+  country     String? @db.VarChar(100)
+  countryCode String? @map("country_code") @db.VarChar(2)
+  city        String? @db.VarChar(100)
+
+  healthScore Int @default(0) @map("health_score") @db.Integer // 0-100
+
+  stats PNodeStats[]
+
+  @@index([pubkey])
+  @@index([status])
+  @@index([version])
+  @@index([lastSeenAt])
+  @@index([ipAddress])
+  @@index([country])
+  @@map("pnodes")
+}
+
+model PNodeStats {
+  id        BigInt   @id @default(autoincrement())
+  timestamp DateTime @default(now()) @db.Timestamptz(6)
+
+  pnodeId String @map("pnode_id") @db.Uuid
+  pnode   PNode  @relation(fields: [pnodeId], references: [id], onDelete: Cascade)
+
+  storageCommitted    BigInt @map("storage_committed") @db.BigInt
+  storageUsed         BigInt @map("storage_used") @db.BigInt
+  storageUsagePercent Float  @map("storage_usage_percent") @db.DoublePrecision
+
+  cpuPercent Float? @map("cpu_percent") @db.DoublePrecision
+  ramUsed    BigInt? @map("ram_used") @db.BigInt
+  ramTotal   BigInt? @map("ram_total") @db.BigInt
+  uptime     Int    @db.Integer
+
+  activeStreams    Int?    @map("active_streams") @db.Integer
+  packetsReceived  BigInt? @map("packets_received") @db.BigInt
+  packetsSent      BigInt? @map("packets_sent") @db.BigInt
+  totalBytes       BigInt? @map("total_bytes") @db.BigInt
+  totalPages       Int?    @map("total_pages") @db.Integer
+  currentIndex     Int?    @map("current_index") @db.Integer
+
+  healthScore Int @default(0) @map("health_score") @db.Integer // 0-100
+
+  @@unique([pnodeId, timestamp])
+
+  @@index([pnodeId, timestamp(sort: Desc)])
+  @@index([timestamp(sort: Desc)])
+  @@map("pnode_stats")
+}
+
+model NetworkStats {
+  id        BigInt   @id @default(autoincrement())
+  timestamp DateTime @default(now()) @db.Timestamptz(6)
+
+  totalPNodes    Int @map("total_pnodes") @db.Integer
+  onlinePNodes   Int @map("online_pnodes") @db.Integer
+  degradedPNodes Int @map("degraded_pnodes") @db.Integer
+  offlinePNodes  Int @map("offline_pnodes") @db.Integer
+
+  totalStorageCommitted   BigInt @map("total_storage_committed") @db.BigInt
+  totalStorageUsed        BigInt @map("total_storage_used") @db.BigInt
+  avgStorageUsagePercent  Float  @map("avg_storage_usage_percent") @db.DoublePrecision
+
+  avgCpuPercent        Float @map("avg_cpu_percent") @db.DoublePrecision
+  avgRamUsagePercent   Float @map("avg_ram_usage_percent") @db.DoublePrecision
+  avgUptime            Int   @map("avg_uptime") @db.Integer
+
+  totalActiveStreams Int    @map("total_active_streams") @db.Integer
+  totalPackets       BigInt @map("total_packets") @db.BigInt
+
+  networkHealthScore Int @map("network_health_score") @db.Integer // 0-100
+
+  @@index([timestamp(sort: Desc)])
+  @@map("network_stats")
+}
+
+
+enum Status {
+  ONLINE   // Last seen < 5 min ago, all metrics normal
+  DEGRADED // Last seen < 5 min ago, some metrics abnormal
+  OFFLINE  // Last seen > 5 min ago
+
+  @@map("status")
+}
+
