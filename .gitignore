@@ -41,3 +41,4 @@ yarn-error.log*
 *.tsbuildinfo
 
 /src/generated/prisma
+/prisma/generated

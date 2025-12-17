@@ -306,7 +306,7 @@ Deno.serve(async (req) => {
         pubkey: pubkey,
         ip_address: ipAddress || '0.0.0.0',
         gossip_port: gossipPort,
-        rpc_port: pod.rpc_port || 0,
+        rpc_port: pod.rpc_port || 6000,
         gossip_address: address,
         is_public: pod.is_public === true,
         version: (pod.version || 'unknown').substring(0, 20),
