@@ -8,7 +8,7 @@ import {
   GetPodsWithStatsResult,
   GetPodsResult,
   DEFAULT_PRPC_CONFIG,
-} from "./types";
+} from "./types.ts";
 
 export class PRPCClient {
   private config: PRPCConfig;

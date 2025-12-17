@@ -8,17 +8,17 @@ datasource db {
 }
 
 model PNode {
-  id        String   @id @default(uuid()) @db.Uuid
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  pubkey        String  @unique @db.VarChar(44) 
+  pubkey        String? @db.VarChar(44) 
   ipAddress     String  @map("ip_address") @db.VarChar(45) 
   gossipPort    Int     @default(9001) @map("gossip_port") @db.Integer
   rpcPort       Int     @default(6000) @map("rpc_port") @db.Integer
   gossipAddress String? @map("gossip_address") @db.VarChar(100) 
 
-  isPublic Boolean @default(true) @map("is_public")
+  isPublic Boolean @default(dbgenerated("true")) @map("is_public")
   version  String  @default("0.8.0") @db.VarChar(20)
   status   Status  @default(ONLINE)
 
@@ -31,9 +31,9 @@ model PNode {
   ramUsed     BigInt @default(0) @map("ram_used") @db.BigInt
   ramTotal    BigInt @default(0) @map("ram_total") @db.BigInt
   
-  lastSeenTimestamp Int      @map("last_seen_timestamp") @db.Integer
-  lastSeenAt        DateTime @map("last_seen_at") @db.Timestamptz(6)
-  firstSeenAt       DateTime @default(now()) @map("first_seen_at") @db.Timestamptz(6)
+  lastSeenTimestamp Int      @default(dbgenerated("extract(epoch from NOW())::integer")) @map("last_seen_timestamp") @db.Integer
+  lastSeenAt        DateTime @default(dbgenerated("NOW()")) @map("last_seen_at") @db.Timestamptz(6)
+  firstSeenAt       DateTime @default(dbgenerated("NOW()")) @map("first_seen_at") @db.Timestamptz(6)
 
   latitude    Float?  @db.DoublePrecision
   longitude   Float?  @db.DoublePrecision
@@ -45,12 +45,14 @@ model PNode {
 
   stats PNodeStats[]
 
+  @@unique([pubkey], map: "pnodes_pubkey_key")
   @@index([pubkey])
   @@index([status])
   @@index([version])
   @@index([lastSeenAt])
   @@index([ipAddress])
   @@index([country])
+  @@index([ipAddress, gossipPort])
   @@map("pnodes")
 }
 
@@ -117,6 +119,7 @@ enum Status {
   ONLINE   // Last seen < 5 min ago, all metrics normal
   DEGRADED // Last seen < 5 min ago, some metrics abnormal
   OFFLINE  // Last seen > 5 min ago
+  INVALID  // Missing critical data (pubkey, address, etc.)
 
   @@map("status")
 }

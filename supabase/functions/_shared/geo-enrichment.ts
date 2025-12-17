@@ -1,5 +1,5 @@
 
-import { GeoLocation } from "./types";
+import { GeoLocation } from "./types.ts";
 
 interface IPAPIResponse {
   ip: string;
@@ -29,23 +29,20 @@ export async function getGeoLocation(
   }
 
   const ip = ipAddress.split(":")[0];
+  const apiKey = Deno.env.get("IP_API_KEY")
 
   try {
     if (enableLogging) {
       console.log(`[GEO] Fetching geo data for ${ip}`);
     }
 
-    // Use ipapi.co free tier
-    const response = await fetch(`https://ipapi.co/${ip}/json/`, {
+    const response = await fetch(`http://api.ipapi.com/api/${ip}?access_key=${apiKey}`, {
       method: "GET",
-      headers: {
-        "User-Agent": "xandeum-analytics/1.0",
-      },
-      signal: AbortSignal.timeout(5000), // 5 second timeout
     });
 
     if (!response.ok) {
-      throw new Error(`ipapi.co returned ${response.status}`);
+      console.error(`[GEO] API error for ${ip}: HTTP ${response.status} ${response.statusText}`);
+      return getNullGeoLocation();
     }
 
     const data: IPAPIResponse = await response.json();
@@ -55,13 +52,24 @@ export async function getGeoLocation(
       return getNullGeoLocation();
     }
 
-    const geoLocation: GeoLocation = {
-      country: data.country_name || null,
-      countryCode: data.country_code || null,
-      city: data.city || null,
-      latitude: data.latitude || null,
-      longitude: data.longitude || null,
+    const parseLatLng = (val: any): number | null => {
+      if (val === null || val === undefined || val === '') return null;
+      const parsed = typeof val === 'string' ? parseFloat(val) : val;
+      return isNaN(parsed) ? null : parsed;
     };
+
+    const geoLocation: GeoLocation = {
+      country: data.country_name?.trim() || null,
+      countryCode: data.country_code?.trim() || null,
+      city: data.city?.trim() || null,
+      latitude: parseLatLng(data.latitude),
+      longitude: parseLatLng(data.longitude),
+    };
+
+    // Log if we got country but missing lat/lng (debugging)
+    if (geoLocation.country && (geoLocation.latitude === null || geoLocation.longitude === null)) {
+      console.warn(`[GEO] ${ip} has country "${geoLocation.country}" but missing coordinates. Raw data:`, JSON.stringify(data));
+    }
 
     GEO_CACHE.set(ipAddress, geoLocation);
 
@@ -73,7 +81,7 @@ export async function getGeoLocation(
 
     return geoLocation;
   } catch (error) {
-    console.error(`[GEO] Failed to fetch geo data for ${ip}:`, error);
+    console.error(`[GEO] Failed to fetch geo data for ${ip}:`, error.message || error);
     return getNullGeoLocation();
   }
 }
@@ -83,22 +91,29 @@ export async function batchGetGeoLocations(
   enableLogging = false
 ): Promise<Map<string, GeoLocation>> {
   const results = new Map<string, GeoLocation>();
+  let successCount = 0;
+  let failCount = 0;
 
   const BATCH_SIZE = 5;
-  const BATCH_DELAY = 1000; // 1 second between batches
+  const BATCH_DELAY = 800; // 800ms between batches
 
   for (let i = 0; i < ipAddresses.length; i += BATCH_SIZE) {
     const batch = ipAddresses.slice(i, i + BATCH_SIZE);
 
-    if (enableLogging) {
+    if (enableLogging && i % 50 === 0) {
       console.log(
-        `[GEO] Processing batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(ipAddresses.length / BATCH_SIZE)}`
+        `[GEO] Processing batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(ipAddresses.length / BATCH_SIZE)} (${successCount} successful, ${failCount} failed)`
       );
     }
 
     const promises = batch.map(async (ip) => {
-      const geo = await getGeoLocation(ip, enableLogging);
+      const geo = await getGeoLocation(ip, false);
       results.set(ip, geo);
+      if (geo.country) {
+        successCount++;
+      } else {
+        failCount++;
+      }
     });
 
     await Promise.all(promises);
@@ -107,6 +122,8 @@ export async function batchGetGeoLocations(
       await new Promise((resolve) => setTimeout(resolve, BATCH_DELAY));
     }
   }
+  
+  console.log(`[GEO] Batch complete: ${successCount} successful, ${failCount} failed out of ${ipAddresses.length} total`);
 
   return results;
 }
@@ -119,16 +136,4 @@ function getNullGeoLocation(): GeoLocation {
     latitude: null,
     longitude: null,
   };
-}
-
-export function needsGeoRefresh(
-  existingGeo: GeoLocation | null,
-  ipAddress: string
-): boolean {
-
-  if (!existingGeo || !existingGeo.country) {
-    return true;
-  }
-
-  return !GEO_CACHE.has(ipAddress);
 }
