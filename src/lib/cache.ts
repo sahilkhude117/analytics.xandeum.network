@@ -35,6 +35,10 @@ export async function withCache<T>(
   ttlSeconds: number,
   fn: () => Promise<T>
 ): Promise<T> {
+  if (ttlSeconds <= 0) {
+    return await fn();
+  }
+
   const cached = await getCached<T>(key);
   if (cached !== null) {
     return cached;

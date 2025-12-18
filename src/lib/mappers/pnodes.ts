@@ -22,7 +22,8 @@ export function mapPNodeToListItem(pnode: PNode): PNodeListItem {
 
 export function mapPNodeToDetail(
   pnode: PNode,
-  latestStats?: PNodeStats | null
+  latestStats?: PNodeStats | null,
+  dataSource: "live" | "historical" | "unavailable" = "historical"
 ): PNodeDetail {
   return {
     id: pnode.id,
@@ -31,6 +32,7 @@ export function mapPNodeToDetail(
     gossipPort: pnode.gossipPort,
     rpcPort: pnode.rpcPort,
     gossipAddress: pnode.gossipAddress,
+    isPublic: pnode.isPublic,
     status: pnode.status,
     version: pnode.version,
     country: pnode.country,
@@ -44,7 +46,6 @@ export function mapPNodeToDetail(
     lastSeenAt: pnode.lastSeenAt.toISOString(),
     firstSeenAt: pnode.firstSeenAt.toISOString(),
     healthScore: pnode.healthScore,
-    // Live stats from pnode_stats (if available)
     cpuPercent: latestStats?.cpuPercent ?? null,
     ramUsed: latestStats?.ramUsed?.toString() ?? null,
     ramTotal: latestStats?.ramTotal?.toString() ?? null,
@@ -54,5 +55,7 @@ export function mapPNodeToDetail(
     totalBytes: latestStats?.totalBytes?.toString() ?? null,
     totalPages: latestStats?.totalPages ?? null,
     currentIndex: latestStats?.currentIndex ?? null,
+    dataSource,
+    statsTimestamp: latestStats?.timestamp.toISOString() ?? null,
   };
 }

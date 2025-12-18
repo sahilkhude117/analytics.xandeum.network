@@ -49,6 +49,7 @@ export interface PNodeDetail extends PNodeListItem {
   gossipPort: number;
   rpcPort: number;
   gossipAddress: string | null;
+  isPublic: boolean;
   firstSeenAt: string;
   cpuPercent: number | null;
   ramUsed: string | null;
@@ -59,14 +60,48 @@ export interface PNodeDetail extends PNodeListItem {
   totalBytes: string | null;
   totalPages: number | null;
   currentIndex: number | null;
+  dataSource: "live" | "historical" | "unavailable";
+  statsTimestamp: string | null;
 }
 
 export interface PNodeHistoryPoint {
   timestamp: string;
+  storageCommitted: string;
   storageUsed: string;
   storageUsagePercent: number;
+  cpuPercent: number | null;
+  ramUsed: string | null;
+  ramTotal: string | null;
+  ramUsagePercent: number | null;
   uptime: number;
+  activeStreams: number | null;
+  packetsReceived: string | null;
+  packetsSent: string | null;
+  totalBytes: string | null;
+  totalPages: number | null;
   healthScore: number;
+}
+
+export interface PNodeHistoryMetadata {
+  pubkey: string | null;
+  isPublic: boolean;
+  timeRange: string;
+  totalPoints: number;
+  availablePoints: number;
+  startTime: string;
+  endTime: string;
+  hasGaps: boolean;
+  gapPercentage: number;
+  availableMetrics: string[];
+  unavailableMetrics: {
+    [key: string]: string; // metric -> reason
+  };
+}
+
+export interface PNodeHistory {
+  metadata: PNodeHistoryMetadata;
+  dataPoints: PNodeHistoryPoint[];
+  livePoint?: PNodeHistoryPoint; 
 }
 
 export interface Network {

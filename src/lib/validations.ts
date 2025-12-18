@@ -19,8 +19,16 @@ export type PNodeListQuery = z.infer<typeof PNodeListQuerySchema>;
 export const IdOrPubkeySchema = z.string().min(1);
 
 export const HistoryQuerySchema = z.object({
-  range: z.enum(["1h", "6h", "24h", "7d", "30d"]).default("24h"),
-  interval: z.enum(["auto", "1m", "5m", "15m", "1h", "1d"]).default("auto"),
+  timeRange: z.enum(["1h", "6h", "24h", "7d", "30d"]).default("24h"),
+  metrics: z
+    .string()
+    .optional()
+    .transform((val) => val?.split(",").filter(Boolean)),
+  includeLive: z
+    .string()
+    .optional()
+    .transform((val) => val === "true")
+    .default(false),
 });
 
 export type HistoryQuery = z.infer<typeof HistoryQuerySchema>;
