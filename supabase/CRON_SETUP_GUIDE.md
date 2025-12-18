@@ -1,6 +1,4 @@
-# Phase 2: Automated Data Collection with pg_cron
-
-**Automated data collection every 1 minute** - Edge Function collects all pNode stats 
+# Cron Jobs Setup Guide: Automated Data Collection with pg_cron
 
 ### **Step 1: Open Supabase SQL Editor**
 
@@ -21,7 +19,7 @@ CREATE EXTENSION IF NOT EXISTS pg_cron;
 
 ---
 
-### **Step 3: Create Cron Job for Stats Collection (Every 1 Minute)**
+### **Step 3: Create Cron Job for Stats Collection (get-pods-with-stats) (Every 1 Minute)**
 
 ```sql
 SELECT cron.schedule(
@@ -36,6 +34,9 @@ SELECT cron.schedule(
   $$
 );
 ```
+
+---
+### **Step 3: Create Cron Job for Detailed Stats Collection (get-stats) (Every Hour)**
 
 ```sql
 SELECT cron.schedule(
@@ -52,7 +53,9 @@ SELECT cron.schedule(
 );
 ```
 
-### Step 4: Verify All Jobs Are Scheduled**
+---
+
+### **Step 4: Verify All Jobs Are Scheduled**
 
 ```sql
 SELECT 
