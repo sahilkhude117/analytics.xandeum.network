@@ -104,6 +104,49 @@ export interface PNodeHistory {
   livePoint?: PNodeHistoryPoint; 
 }
 
+export interface NetworkHistoryPoint {
+  timestamp: string;
+  totalPNodes: number;
+  onlinePNodes: number;
+  degradedPNodes: number;
+  offlinePNodes: number;
+  publicPNodes: number;
+  privatePNodes: number;
+  totalStorageCommitted: string;
+  totalStorageUsed: string;
+  avgStorageUsagePercent: number;
+  avgCpuPercent: number | null;
+  avgRamUsagePercent: number | null;
+  avgUptime: number;
+  totalActiveStreams: number | null;
+  totalPacketsReceived: string | null;
+  totalPacketsSent: string | null;
+  totalBytes: string | null;
+  totalPages: number | null;
+  networkHealthScore: number;
+  detailedStatsCoverage: number;
+}
+
+export interface NetworkHistoryMetadata {
+  timeRange: string;
+  totalPoints: number;
+  availablePoints: number;
+  startTime: string;
+  endTime: string;
+  hasGaps: boolean;
+  gapPercentage: number;
+  availableMetrics: string[];
+  unavailableMetrics: {
+    [key: string]: string; // metric -> reason
+  };
+}
+
+export interface NetworkHistory {
+  metadata: NetworkHistoryMetadata;
+  dataPoints: NetworkHistoryPoint[];
+  livePoint?: NetworkHistoryPoint;
+}
+
 export interface Network {
   timestamp: string;
   totalPNodes: number;
@@ -141,6 +184,44 @@ export interface NetworkStats {
   totalBytes: string | null;
   totalPages: number | null;
   networkHealthScore: number;
+}
+
+export interface NetworkLiveMetrics {
+  timestamp: string;
+  totalPNodes: number;
+  onlinePNodes: number;
+  degradedPNodes: number;
+  offlinePNodes: number;
+  publicPNodes: number;
+  privatePNodes: number;
+  totalStorageCommitted: string;
+  totalStorageUsed: string;
+  avgStorageUsagePercent: number;
+  avgUptime: number;
+  networkHealthScore: number;
+}
+
+export interface NetworkDetailedMetrics {
+  timestamp: string;
+  avgCpuPercent: number | null;
+  avgRamUsagePercent: number | null;
+  totalActiveStreams: number | null;
+  totalPacketsReceived: string | null;
+  totalPacketsSent: string | null;
+  totalBytes: string | null;
+  totalPages: number | null;
+  detailedStatsCoverage: number;
+}
+
+export interface NetworkHybridResponse {
+  dataSource: "historical" | "live";
+  liveMetrics?: NetworkLiveMetrics;
+  detailedMetrics: NetworkDetailedMetrics;
+  metadata: {
+    liveDataAge?: string;
+    detailedDataAge: string;
+    nextUpdateIn?: number; // Seconds until next hourly update
+  };
 }
 
 export interface LiveNodeStats {
