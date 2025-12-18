@@ -69,7 +69,7 @@ export interface PNodeHistoryPoint {
   healthScore: number;
 }
 
-export interface NetworkStats {
+export interface Network {
   timestamp: string;
   totalPNodes: number;
   onlinePNodes: number;
@@ -79,6 +79,32 @@ export interface NetworkStats {
   totalStorageUsed: string;
   avgStorageUsagePercent: number;
   avgUptime: number;
+  networkHealthScore: number;
+}
+
+export interface NetworkStats {
+  timestamp: string;
+  totalPNodes: number;
+  onlinePNodes: number;
+  degradedPNodes: number;
+  offlinePNodes: number;
+  // Metadata for transparency
+  publicPNodes: number; // Nodes with RPC access
+  privatePNodes: number; // Nodes without RPC access
+  detailedStatsCoverage: number; // Percentage (0-100)
+  // Accurate metrics (from ALL nodes)
+  totalStorageCommitted: string;
+  totalStorageUsed: string;
+  avgStorageUsagePercent: number;
+  avgUptime: number;
+  // Sampled metrics (from PUBLIC nodes only)
+  avgCpuPercent: number | null; 
+  avgRamUsagePercent: number | null; 
+  totalActiveStreams: number | null; 
+  totalPacketsReceived: string | null;
+  totalPacketsSent: string | null;
+  totalBytes: string | null;
+  totalPages: number | null;
   networkHealthScore: number;
 }
 
