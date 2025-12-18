@@ -29,9 +29,6 @@ model PNode {
   storageUsagePercent  Float  @default(0) @map("storage_usage_percent") @db.DoublePrecision
 
   uptime      Int   @default(0) @db.Integer // seconds
-  cpuPercent  Float @default(0) @map("cpu_percent") @db.DoublePrecision
-  ramUsed     BigInt @default(0) @map("ram_used") @db.BigInt
-  ramTotal    BigInt @default(0) @map("ram_total") @db.BigInt
   
   lastSeenTimestamp Int      @default(dbgenerated("extract(epoch from NOW())::integer")) @map("last_seen_timestamp") @db.Integer
   lastSeenAt        DateTime @default(dbgenerated("NOW()")) @map("last_seen_at") @db.Timestamptz(6)
@@ -90,27 +87,55 @@ model PNodeStats {
   @@map("pnode_stats")
 }
 
+model Network {
+  id                     String   @id @default("singleton")
+  timestamp              DateTime @updatedAt @db.Timestamptz(6)
+  
+  totalPNodes            Int      @map("total_pnodes") @db.Integer
+  onlinePNodes           Int      @map("online_pnodes") @db.Integer
+  degradedPNodes         Int      @map("degraded_pnodes") @db.Integer
+  offlinePNodes          Int      @map("offline_pnodes") @db.Integer
+  
+  totalStorageCommitted  BigInt   @map("total_storage_committed") @db.BigInt
+  totalStorageUsed       BigInt   @map("total_storage_used") @db.BigInt
+  avgStorageUsagePercent Float    @map("avg_storage_usage_percent") @db.DoublePrecision
+  
+  avgUptime              Int      @map("avg_uptime") @db.Integer
+  networkHealthScore     Int      @map("network_health_score") @db.Integer
+
+  @@map("network")
+}
+
 model NetworkStats {
-  id        BigInt   @id @default(autoincrement())
-  timestamp DateTime @default(now()) @db.Timestamptz(6)
+  id                     BigInt   @id @default(autoincrement())
+  timestamp              DateTime @default(now()) @db.Timestamptz(6)
 
-  totalPNodes    Int @map("total_pnodes") @db.Integer
-  onlinePNodes   Int @map("online_pnodes") @db.Integer
-  degradedPNodes Int @map("degraded_pnodes") @db.Integer
-  offlinePNodes  Int @map("offline_pnodes") @db.Integer
+  totalPNodes            Int      @map("total_pnodes") @db.Integer
+  onlinePNodes           Int      @map("online_pnodes") @db.Integer
+  degradedPNodes         Int      @map("degraded_pnodes") @db.Integer
+  offlinePNodes          Int      @map("offline_pnodes") @db.Integer
 
-  totalStorageCommitted   BigInt @map("total_storage_committed") @db.BigInt
-  totalStorageUsed        BigInt @map("total_storage_used") @db.BigInt
-  avgStorageUsagePercent  Float  @map("avg_storage_usage_percent") @db.DoublePrecision
+  // Metadata for transparency about partial coverage
+  publicPNodes           Int      @map("public_pnodes") @db.Integer // Nodes with RPC access
+  privatePNodes          Int      @map("private_pnodes") @db.Integer // Nodes without RPC access
+  detailedStatsCoverage  Float    @map("detailed_stats_coverage") @db.DoublePrecision // Percentage of nodes with detailed stats
 
-  avgCpuPercent        Float @map("avg_cpu_percent") @db.DoublePrecision
-  avgRamUsagePercent   Float @map("avg_ram_usage_percent") @db.DoublePrecision
-  avgUptime            Int   @map("avg_uptime") @db.Integer
+  totalStorageCommitted  BigInt   @map("total_storage_committed") @db.BigInt
+  totalStorageUsed       BigInt   @map("total_storage_used") @db.BigInt
+  avgStorageUsagePercent Float    @map("avg_storage_usage_percent") @db.DoublePrecision
 
-  totalActiveStreams Int    @map("total_active_streams") @db.Integer
-  totalPackets       BigInt @map("total_packets") @db.BigInt
+  // These are ONLY from public nodes (sampled metrics)
+  avgCpuPercent          Float?   @map("avg_cpu_percent") @db.DoublePrecision
+  avgRamUsagePercent     Float?   @map("avg_ram_usage_percent") @db.DoublePrecision
+  avgUptime              Int      @map("avg_uptime") @db.Integer
 
-  networkHealthScore Int @map("network_health_score") @db.Integer // 0-100
+  totalActiveStreams     Int?     @map("total_active_streams") @db.Integer
+  totalPacketsReceived   BigInt?  @map("total_packets_received") @db.BigInt
+  totalPacketsSent       BigInt?  @map("total_packets_sent") @db.BigInt
+  totalBytes             BigInt?  @map("total_bytes") @db.BigInt
+  totalPages             Int?     @map("total_pages") @db.Integer
+
+  networkHealthScore     Int      @map("network_health_score") @db.Integer
 
   @@index([timestamp(sort: Desc)])
   @@map("network_stats")
