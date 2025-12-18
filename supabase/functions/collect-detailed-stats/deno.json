@@ -1,0 +1,9 @@
+{
+  "imports": {
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.39.3",
+    "@/types": "../_shared/types.ts",
+    "@/prpc-client": "../_shared/prpc-client.ts",
+    "@/health-score": "../_shared/health-score.ts",
+    "../_shared/types.ts": "../_shared/types.ts"
+  }
+}

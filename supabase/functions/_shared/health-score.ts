@@ -1,9 +1,8 @@
 
 
 export interface HealthMetrics {
-  isOnline: boolean;
   storageUsagePercent: number;
-  cpuPercent: number;
+  cpuPercent?: number; // Optional - only available for public nodes with detailed stats
   uptime: number;
   lastSeenMinutes: number;
 }
@@ -12,7 +11,9 @@ export function calculateHealthScore(metrics: HealthMetrics): number {
   let score = 0;
 
   // 1. Online status (40 points max)
-  if (metrics.isOnline) {
+  // A node is considered online if seen in the last 5 minutes
+  const isOnline = metrics.lastSeenMinutes < 5;
+  if (isOnline) {
     score += 40;
   } else {
     return 0; // Offline = 0 score
@@ -45,18 +46,22 @@ export function calculateHealthScore(metrics: HealthMetrics): number {
   }
   // 0 points if >95% (critical)
 
-  // 4. CPU health (10 points max)
+  // 4. CPU health (10 points max) - OPTIONAL
+  // Only scored for public nodes with detailed stats
   // Lower CPU is better (not overloaded)
-  const cpuPercent = metrics.cpuPercent;
-  if (cpuPercent >= 0 && cpuPercent <= 20) {
-    score += 10; // Low CPU usage
-  } else if (cpuPercent > 20 && cpuPercent <= 50) {
-    score += 7; // Moderate CPU
-  } else if (cpuPercent > 50 && cpuPercent <= 80) {
-    score += 4; // High CPU
-  } else if (cpuPercent > 80) {
-    score += 1; // Critical CPU
+  if (metrics.cpuPercent !== undefined && metrics.cpuPercent !== null) {
+    const cpuPercent = metrics.cpuPercent;
+    if (cpuPercent >= 0 && cpuPercent <= 20) {
+      score += 10; // Low CPU usage
+    } else if (cpuPercent > 20 && cpuPercent <= 50) {
+      score += 7; // Moderate CPU
+    } else if (cpuPercent > 50 && cpuPercent <= 80) {
+      score += 4; // High CPU
+    } else if (cpuPercent > 80) {
+      score += 1; // Critical CPU
+    }
   }
+  // Skip CPU scoring when not available (private nodes, network-wide calculations)
 
   // 5. Uptime (15 points max)
   // Longer uptime = more stable node

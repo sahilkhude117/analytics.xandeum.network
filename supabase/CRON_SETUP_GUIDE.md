@@ -29,10 +29,25 @@ SELECT cron.schedule(
   '* * * * *',
   $$
   SELECT net.http_post(
-    url := 'https://{project identifier}/functions/v1/collect-pnode-stats',
+    url := 'https://YOUR_PROJECT_REF.supabase.co/functions/v1/collect-pnode-stats',
     headers := '{"Content-Type": "application/json", "Authorization": "Bearer {serviceRolekey}"}'::jsonb,
     body := '{}'::jsonb
   ) AS request_id;
+  $$
+);
+```
+
+```sql
+SELECT cron.schedule(
+  'collect-detailed-stats-hourly',
+  '0 * * * *', -- Every hour at :00
+  $$
+  SELECT
+    net.http_post(
+      url := 'https://YOUR_PROJECT_REF.supabase.co/functions/v1/collect-detailed-stats',
+      headers := '{"Content-Type": "application/json", "Authorization": "Bearer YOUR_ANON_KEY"}'::jsonb,
+      body := '{}'::jsonb
+    ) AS request_id;
   $$
 );
 ```

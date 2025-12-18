@@ -22,9 +22,6 @@ interface PNodeRecord {
   storage_used: string;
   storage_usage_percent: number;
   uptime: number;
-  cpu_percent: number;
-  ram_used: string;
-  ram_total: string;
   last_seen_timestamp: number;
   last_seen_at: string;
   first_seen_at?: string;
@@ -37,26 +34,8 @@ interface PNodeRecord {
   health_score: number;
 }
 
-interface PNodeStatsRecord {
-  pnode_id: string;
-  timestamp: string;
-  storage_committed: string;
-  storage_used: string;
-  storage_usage_percent: number;
-  cpu_percent: number;
-  ram_used: string;
-  ram_total: string;
-  uptime: number;
-  active_streams: number | null;
-  packets_received: string | null;
-  packets_sent: string | null;
-  total_bytes: string | null;
-  total_pages: number | null;
-  current_index: number | null;
-  health_score: number;
-}
-
-interface NetworkStatsRecord {
+interface NetworkRecord {
+  id: string;
   timestamp: string;
   total_pnodes: number;
   online_pnodes: number;
@@ -65,11 +44,7 @@ interface NetworkStatsRecord {
   total_storage_committed: string;
   total_storage_used: string;
   avg_storage_usage_percent: number;
-  avg_cpu_percent: number;
-  avg_ram_usage_percent: number;
   avg_uptime: number;
-  total_active_streams: number;
-  total_packets: string;
   network_health_score: number;
 }
 
@@ -94,7 +69,6 @@ Deno.serve(async (req) => {
       throw new Error("No pNodes returned from network");
     }
 
-    // Separate valid and invalid pNodes (don't discard invalid ones!)
     const validPods: typeof result.pods = [];
     const invalidPods: typeof result.pods = [];
     
@@ -110,7 +84,6 @@ Deno.serve(async (req) => {
 
     const now = new Date().toISOString();
     const pnodesData: PNodeRecord[] = [];
-    const statsData: PNodeStatsRecord[] = [];
 
     console.log("[STATS] Fetching existing pNodes from database...");
     const { data: existingPNodes } = await supabase
@@ -132,8 +105,7 @@ Deno.serve(async (req) => {
     const existingPNodesMap = new Map(
       (existingPNodes || []).map((p) => [p.pubkey, p])
     );
-    
-    // Create a map for invalid pNodes by IP:port for matching
+
     const existingInvalidByAddress = new Map(
       (existingPNodes || [])
         .filter(p => p.status === 'INVALID')
@@ -142,8 +114,7 @@ Deno.serve(async (req) => {
     
     console.log(`[STATS] Found ${existingPNodesMap.size} existing pNodes in database`);
     console.log(`[STATS] Found ${existingInvalidByAddress.size} existing INVALID pNodes`);
-    
-    // Check for complete geo data (all fields populated)
+
     const existingWithCompleteGeo = Array.from(existingPNodesMap.values()).filter(p => 
       p.country && p.country_code && p.city && p.latitude !== null && p.longitude !== null
     ).length;
@@ -210,12 +181,8 @@ Deno.serve(async (req) => {
       const lastSeenAt = new Date(pod.last_seen_timestamp * 1000);
       const lastSeenMinutes = (Date.now() - lastSeenAt.getTime()) / 1000 / 60;
 
-      const isOnline = lastSeenMinutes < 5;
-
       const healthScore = calculateHealthScore({
-        isOnline,
         storageUsagePercent: pod.storage_usage_percent,
-        cpuPercent: 0, 
         uptime: pod.uptime,
         lastSeenMinutes,
       });
@@ -231,7 +198,6 @@ Deno.serve(async (req) => {
       // Determine final geo data: use API data if available, otherwise preserve ALL existing data
       let finalGeoData;
       if (geoData) {
-        // We got fresh data from API
         finalGeoData = {
           country: geoData.country,
           countryCode: geoData.countryCode,
@@ -240,7 +206,6 @@ Deno.serve(async (req) => {
           longitude: geoData.longitude,
         };
       } else if (existing) {
-        // Preserve existing complete data
         finalGeoData = {
           country: existing.country,
           countryCode: existing.country_code,
@@ -249,7 +214,6 @@ Deno.serve(async (req) => {
           longitude: existing.longitude,
         };
       } else {
-        // New pNode with no geo data
         finalGeoData = {
           country: null,
           countryCode: null,
@@ -272,9 +236,6 @@ Deno.serve(async (req) => {
         storage_used: String(pod.storage_used || 0),
         storage_usage_percent: pod.storage_usage_percent || 0,
         uptime: pod.uptime,
-        cpu_percent: 0, 
-        ram_used: "0",
-        ram_total: "0",
         last_seen_timestamp: pod.last_seen_timestamp,
         last_seen_at: lastSeenAt.toISOString(),
         first_seen_at: lastSeenAt.toISOString(),
@@ -296,7 +257,6 @@ Deno.serve(async (req) => {
       const [ipAddress, portStr] = address.split(':');
       const gossipPort = parseInt(portStr) || 0;
       
-      // Check if this IP:port combination already exists as INVALID
       const existingInvalid = existingInvalidByAddress.get(address);
       const pubkey = existingInvalid?.pubkey || 
                      pod.pubkey?.trim() || 
@@ -315,9 +275,6 @@ Deno.serve(async (req) => {
         storage_used: String(pod.storage_used || 0),
         storage_usage_percent: pod.storage_usage_percent || 0,
         uptime: pod.uptime || 0,
-        cpu_percent: 0,
-        ram_used: '0',
-        ram_total: '0',
         last_seen_timestamp: pod.last_seen_timestamp || Math.floor(Date.now() / 1000),
         last_seen_at: lastSeenAt.toISOString(),
         first_seen_at: lastSeenAt.toISOString(),
@@ -330,86 +287,21 @@ Deno.serve(async (req) => {
         health_score: 0,
       });
     }
-    // Deduplicate by pubkey (keep last occurrence)
+
     const uniquePNodesMap = new Map<string, PNodeRecord>();
     pnodesData.forEach(pnode => uniquePNodesMap.set(pnode.pubkey, pnode));
     const uniquePNodesData = Array.from(uniquePNodesMap.values());
     
     console.log(`[STATS] Upserting ${uniquePNodesData.length} unique pNodes (from ${pnodesData.length} total)...`);
-    const { data: upsertedPNodes, error: upsertError } = await supabase
+    const { error: upsertError } = await supabase
       .from("pnodes")
       .upsert(uniquePNodesData, {
         onConflict: "pubkey",
         ignoreDuplicates: false,
-      })
-      .select("pubkey, id");
+      });
 
     if (upsertError) {
       throw new Error(`Failed to upsert pNodes: ${upsertError.message}`);
-    }
-
-    const pnodeIdMap = new Map(
-      (upsertedPNodes || []).map((p: { pubkey: string; id: string }) => [p.pubkey, p.id])
-    );
-
-    for (const pod of validPods) {
-      const pnodeId = pnodeIdMap.get(pod.pubkey);
-      if (!pnodeId) {
-        console.warn(`[STATS] No ID found for pubkey ${pod.pubkey}, skipping stats`);
-        continue;
-      }
-
-      const lastSeenMinutes = (Date.now() - pod.last_seen_timestamp * 1000) / 1000 / 60;
-      const isOnline = lastSeenMinutes < 5;
-
-      const healthScore = calculateHealthScore({
-        isOnline,
-        storageUsagePercent: pod.storage_usage_percent,
-        cpuPercent: 0,
-        uptime: pod.uptime,
-        lastSeenMinutes,
-      });
-
-      const statsRecord: PNodeStatsRecord = {
-        pnode_id: pnodeId,
-        timestamp: now,
-        storage_committed: String(pod.storage_committed || 0),
-        storage_used: String(pod.storage_used || 0),
-        storage_usage_percent: pod.storage_usage_percent || 0,
-        cpu_percent: 0,
-        ram_used: "0",
-        ram_total: "0",
-        uptime: pod.uptime,
-        active_streams: null,
-        packets_received: null,
-        packets_sent: null,
-        total_bytes: null,
-        total_pages: null,
-        current_index: null,
-        health_score: healthScore,
-      };
-
-      statsData.push(statsRecord);
-    }
-
-    // Deduplicate stats by (pnode_id, timestamp) - keep last occurrence
-    const uniqueStatsMap = new Map<string, PNodeStatsRecord>();
-    statsData.forEach(stat => {
-      const key = `${stat.pnode_id}_${stat.timestamp}`;
-      uniqueStatsMap.set(key, stat);
-    });
-    const uniqueStatsData = Array.from(uniqueStatsMap.values());
-    
-    console.log(`[STATS] Upserting ${uniqueStatsData.length} unique stats records (from ${statsData.length} total)...`);
-    const { error: statsError } = await supabase
-      .from("pnode_stats")
-      .upsert(uniqueStatsData, {
-        onConflict: "pnode_id,timestamp",
-        ignoreDuplicates: false,
-      });
-
-    if (statsError) {
-      throw new Error(`Failed to insert stats: ${statsError.message}`);
     }
 
     const validPNodesForStats = pnodesData.filter(p => p.status !== 'INVALID');
@@ -429,8 +321,6 @@ Deno.serve(async (req) => {
     const avgStorageUsagePercent =
       validPNodesForStats.reduce((sum, p) => sum + p.storage_usage_percent, 0) /
       (validPNodesForStats.length || 1);
-    const avgCpuPercent = 0; // Not available
-    const avgRamUsagePercent = 0; // Not available
     const avgUptime =
       validPNodesForStats.reduce((sum, p) => sum + p.uptime, 0) / (validPNodesForStats.length || 1);
 
@@ -438,7 +328,8 @@ Deno.serve(async (req) => {
       validPNodesForStats.reduce((sum, p) => sum + p.health_score, 0) / validPNodesForStats.length
     ) : 0;
 
-    const networkStatsRecord: NetworkStatsRecord = {
+    const networkRecord: NetworkRecord = {
+      id: 'singleton',
       timestamp: now,
       total_pnodes: result.total_count,
       online_pnodes: onlineCount,
@@ -447,21 +338,20 @@ Deno.serve(async (req) => {
       total_storage_committed: String(totalStorageCommitted),
       total_storage_used: String(totalStorageUsed),
       avg_storage_usage_percent: avgStorageUsagePercent,
-      avg_cpu_percent: avgCpuPercent,
-      avg_ram_usage_percent: avgRamUsagePercent,
       avg_uptime: Math.round(avgUptime),
-      total_active_streams: 0,
-      total_packets: "0",
       network_health_score: networkHealthScore,
     };
 
-    console.log("[STATS] Inserting network stats...");
+    console.log("[STATS] Upserting network singleton...");
     const { error: networkError } = await supabase
-      .from("network_stats")
-      .insert(networkStatsRecord);
+      .from("network")
+      .upsert(networkRecord, {
+        onConflict: "id",
+        ignoreDuplicates: false,
+      });
 
     if (networkError) {
-      throw new Error(`Failed to insert network stats: ${networkError.message}`);
+      throw new Error(`Failed to upsert network: ${networkError.message}`);
     }
 
     const duration = Date.now() - startTime;
