@@ -1,3 +1,4 @@
+
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { prpcClient, buildRpcUrl } from "@/lib/prpc-client";
@@ -6,15 +7,10 @@ import { withCache } from "@/lib/cache";
 import { successResponse, errorResponse, handleError } from "@/lib/api";
 import { IdOrPubkeySchema } from "@/lib/validations";
 import { mapPNodeToDetail } from "@/lib/mappers/pnodes";
+import { isUUID } from "@/lib/utils";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function isUUID(value: string): boolean {
-  const uuidRegex =
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  return uuidRegex.test(value);
-}
 
 export async function GET(
   request: NextRequest,
@@ -22,14 +18,17 @@ export async function GET(
 ) {
   try {
     const { idOrPubkey } = await params;
+    const { searchParams } = new URL(request.url);
+    const refresh = searchParams.get("refresh") === "true";
 
     IdOrPubkeySchema.parse(idOrPubkey);
 
     const cacheKey = buildCacheKey(["v1", "pnodes", "item", idOrPubkey]);
+    const cacheTTL = refresh ? 0 : 30;
 
     const result = await withCache(
       cacheKey,
-      30, // 30 seconds TTL
+      cacheTTL,
       async () => {
         const isId = isUUID(idOrPubkey);
 
@@ -46,76 +45,103 @@ export async function GET(
           orderBy: { timestamp: "desc" },
         });
 
-        if (pnode.rpcPort && pnode.rpcPort > 0 && pnode.rpcPort <= 65535) {
+        let dataSource: "live" | "historical" | "unavailable" = latestStats
+          ? "historical"
+          : "unavailable";
+
+        const shouldFetchLive =
+          (refresh || pnode.status === "ONLINE") &&
+          pnode.isPublic &&
+          pnode.rpcPort &&
+          pnode.rpcPort > 0 &&
+          pnode.rpcPort <= 65535;
+
+        if (shouldFetchLive) {
           try {
+            console.log(
+              `[API] Fetching live stats for ${pnode.pubkey} (refresh=${refresh}, status=${pnode.status})`
+            );
             const rpcUrl = buildRpcUrl(pnode.ipAddress, pnode.rpcPort);
             const liveStats = await prpcClient.getStats(rpcUrl);
 
-            // Round timestamp to nearest minute to match cron behavior
             const timestamp = new Date();
             timestamp.setSeconds(0, 0);
 
-            latestStats = await prisma.pNodeStats.upsert({
-              where: {
-                pnodeId_timestamp: {
-                  pnodeId: pnode.id,
-                  timestamp: timestamp,
-                },
-              },
-              update: {
-                // Update with live heavy stats (cron leaves these NULL)
-                cpuPercent: liveStats.cpu_percent,
-                ramUsed: BigInt(liveStats.ram_used),
-                ramTotal: BigInt(liveStats.ram_total),
-                activeStreams: liveStats.active_streams,
-                packetsReceived: BigInt(liveStats.packets_received),
-                packetsSent: BigInt(liveStats.packets_sent),
-                totalBytes: BigInt(liveStats.total_bytes),
-                totalPages: liveStats.total_pages,
-                currentIndex: liveStats.current_index,
-                uptime: liveStats.uptime,
-              },
-              create: {
-                pnodeId: pnode.id,
-                timestamp: timestamp,
-                storageCommitted: pnode.storageCommitted,
-                storageUsed: pnode.storageUsed,
-                storageUsagePercent: pnode.storageUsagePercent,
-                uptime: liveStats.uptime,
-                healthScore: pnode.healthScore,
-                // Heavy stats from get-stats RPC
-                cpuPercent: liveStats.cpu_percent,
-                ramUsed: BigInt(liveStats.ram_used),
-                ramTotal: BigInt(liveStats.ram_total),
-                activeStreams: liveStats.active_streams,
-                packetsReceived: BigInt(liveStats.packets_received),
-                packetsSent: BigInt(liveStats.packets_sent),
-                totalBytes: BigInt(liveStats.total_bytes),
-                totalPages: liveStats.total_pages,
-                currentIndex: liveStats.current_index,
-              },
-            });
+            latestStats = {
+              id: BigInt(0),
+              pnodeId: pnode.id,
+              timestamp: timestamp,
+              storageCommitted: pnode.storageCommitted,
+              storageUsed: pnode.storageUsed,
+              storageUsagePercent: pnode.storageUsagePercent,
+              uptime: liveStats.uptime,
+              healthScore: pnode.healthScore,
+              cpuPercent: liveStats.cpu_percent,
+              ramUsed: BigInt(liveStats.ram_used),
+              ramTotal: BigInt(liveStats.ram_total),
+              activeStreams: liveStats.active_streams,
+              packetsReceived: BigInt(liveStats.packets_received),
+              packetsSent: BigInt(liveStats.packets_sent),
+              totalBytes: BigInt(liveStats.total_bytes),
+              totalPages: liveStats.total_pages,
+              currentIndex: liveStats.current_index,
+            };
 
-            await prisma.pNode.update({
-              where: { id: pnode.id },
-              data: {
-                lastSeenAt: new Date(),
-                lastSeenTimestamp: Math.floor(Date.now() / 1000),
-              },
-            });
+            dataSource = "live";
           } catch (rpcError) {
             console.warn(
               `[API] Failed to fetch live stats for ${pnode.pubkey}:`,
               rpcError
             );
           }
-        } else {
-          console.warn(
-            `[API] Skipping live stats for ${pnode.pubkey}: invalid RPC port ${pnode.rpcPort}`
-          );
+        } else if (refresh && !pnode.isPublic) {
+          try {
+            console.log(
+              `[API] Refreshing private node ${pnode.pubkey} via get-pods-with-stats`
+            );
+            const podsResult = await prpcClient.getPodsWithStats();
+            const podData = podsResult.pods.find(
+              (p) => p.pubkey === pnode.pubkey
+            );
+
+            if (podData) {
+              const timestamp = new Date();
+              timestamp.setSeconds(0, 0);
+
+              latestStats = {
+                id: BigInt(0),
+                pnodeId: pnode.id,
+                timestamp: timestamp,
+                storageCommitted: BigInt(podData.storage_committed),
+                storageUsed: BigInt(podData.storage_used),
+                storageUsagePercent: podData.storage_usage_percent,
+                uptime: podData.uptime,
+                healthScore: pnode.healthScore,
+                cpuPercent: null,
+                ramUsed: null,
+                ramTotal: null,
+                activeStreams: null,
+                packetsReceived: null,
+                packetsSent: null,
+                totalBytes: null,
+                totalPages: null,
+                currentIndex: null,
+              };
+              dataSource = "live";
+            } else {
+              console.warn(
+                `[API] Private node ${pnode.pubkey} not found in get-pods-with-stats`
+              );
+            }
+          } catch (rpcError) {
+            console.warn(
+              `[API] Failed to refresh private node ${pnode.pubkey}:`,
+              rpcError
+            );
+          }
         }
 
-        return mapPNodeToDetail(pnode, latestStats);
+        return mapPNodeToDetail(pnode, latestStats, dataSource);
       }
     );
 
