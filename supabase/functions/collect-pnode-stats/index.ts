@@ -120,7 +120,8 @@ Deno.serve(async (req) => {
     ).length;
     console.log(`[STATS] ${existingWithCompleteGeo} existing pNodes have complete geo data`);
 
-    const ipsNeedingGeo = validPods
+    // Collect IPs needing geo enrichment from BOTH valid and invalid pods
+    const validIpsNeedingGeo = validPods
       .filter((pod) => {
         const existing = existingPNodesMap.get(pod.pubkey);
         const currentIP = pod.address.split(':')[0];
@@ -142,7 +143,32 @@ Deno.serve(async (req) => {
       })
       .map((pod) => pod.address);
 
-    console.log(`[STATS] Enriching geo data for ${ipsNeedingGeo.length} IPs...`);
+    // Also collect IPs from invalid pods that need geo enrichment
+    const invalidIpsNeedingGeo = invalidPods
+      .filter((pod) => {
+        const address = pod.address?.trim() || '0.0.0.0:0';
+        const currentIP = address.split(':')[0];
+        
+        // Skip localhost/invalid IPs
+        if (!currentIP || currentIP === '0.0.0.0') return false;
+        
+        const existingInvalid = existingInvalidByAddress.get(address);
+        if (!existingInvalid) return true;
+        
+        const hasCompleteGeo = existingInvalid.country && existingInvalid.country_code && 
+                              existingInvalid.city && existingInvalid.latitude !== null && 
+                              existingInvalid.longitude !== null;
+        
+        if (!hasCompleteGeo) return true;
+        if (existingInvalid.ip_address !== currentIP) return true;
+        
+        return false;
+      })
+      .map((pod) => pod.address?.trim() || '0.0.0.0:0')
+      .filter(addr => addr !== '0.0.0.0:0');
+
+    const ipsNeedingGeo = [...validIpsNeedingGeo, ...invalidIpsNeedingGeo];
+    console.log(`[STATS] Enriching geo data for ${ipsNeedingGeo.length} IPs (${validIpsNeedingGeo.length} valid + ${invalidIpsNeedingGeo.length} invalid)...`);
     const geoDataMap = ipsNeedingGeo.length > 0
       ? await batchGetGeoLocations(ipsNeedingGeo, true)
       : new Map();
@@ -262,6 +288,37 @@ Deno.serve(async (req) => {
                      pod.pubkey?.trim() || 
                      `INVALID_${ipAddress}_${gossipPort}`;
       
+      // Get geo data for invalid pod
+      const geoData = geoDataMap.get(address);
+      
+      // Determine final geo data: use API data if available, otherwise preserve existing data
+      let finalGeoData;
+      if (geoData) {
+        finalGeoData = {
+          country: geoData.country,
+          countryCode: geoData.countryCode,
+          city: geoData.city,
+          latitude: geoData.latitude,
+          longitude: geoData.longitude,
+        };
+      } else if (existingInvalid) {
+        finalGeoData = {
+          country: existingInvalid.country,
+          countryCode: existingInvalid.country_code,
+          city: existingInvalid.city,
+          latitude: existingInvalid.latitude,
+          longitude: existingInvalid.longitude,
+        };
+      } else {
+        finalGeoData = {
+          country: null,
+          countryCode: null,
+          city: null,
+          latitude: null,
+          longitude: null,
+        };
+      }
+      
       pnodesData.push({
         pubkey: pubkey,
         ip_address: ipAddress || '0.0.0.0',
@@ -279,11 +336,11 @@ Deno.serve(async (req) => {
         last_seen_at: lastSeenAt.toISOString(),
         first_seen_at: lastSeenAt.toISOString(),
         updated_at: now,
-        latitude: null,
-        longitude: null,
-        country: null,
-        country_code: null,
-        city: null,
+        latitude: finalGeoData.latitude,
+        longitude: finalGeoData.longitude,
+        country: finalGeoData.country,
+        country_code: finalGeoData.countryCode,
+        city: finalGeoData.city,
         health_score: 0,
       });
     }
