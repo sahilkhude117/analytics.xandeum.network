@@ -1,6 +1,9 @@
 
 import { KpiCard } from "@/components/ui/kpi-card";
-import { Badge } from "@/components/ui/badge";
+import { StorageUtilizationChart } from "@/components/charts/storage-utilization-chart";
+import { NodeStatusChart } from "@/components/charts/node-status-chart";
+import { TopPerformersTable } from "@/components/tables/top-performers-table";
+import { ArrowRight } from "lucide-react";
 
 export default function Home() {
   // Mock data
@@ -57,7 +60,7 @@ export default function Home() {
           subtitle={`${storageUsedPercentage}% utilized`}
         />
         <KpiCard
-          title="Avg Per pNode"
+          title="Avg Storage Per Pod"
           value={`${networkData.avgCommittedPerPod} TB`}
           subtitle="committed"
         />
@@ -70,6 +73,39 @@ export default function Home() {
           title="Health Score"
           value={`${networkData.healthScore}%`}
         />
+      </div>
+
+      {/* Charts Section */}
+      <div className="mt-8 grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <StorageUtilizationChart />
+        </div>
+        <div className="lg:col-span-1">
+          <NodeStatusChart />
+        </div>
+      </div>
+
+      {/* Top Performers Section */}
+      <div className="mt-8">
+        <TopPerformersTable />
+      </div>
+
+      {/* Navigation Links */}
+      <div className="mt-6 flex items-center justify-center gap-6">
+        <a
+          href="/pods"
+          className="flex items-center gap-2 rounded-lg border border-white/10 bg-[#0b0b0b] px-6 py-3 text-sm font-medium text-[#E5E7EB] transition-all hover:border-[#1E40AF] hover:bg-[#1E40AF]/10"
+        >
+          <span>VIEW ALL PODS</span>
+          <ArrowRight className="h-4 w-4" />
+        </a>
+        <a
+          href="/network"
+          className="flex items-center gap-2 rounded-lg border border-white/10 bg-[#0b0b0b] px-6 py-3 text-sm font-medium text-[#E5E7EB] transition-all hover:border-[#1E40AF] hover:bg-[#1E40AF]/10"
+        >
+          <span>NETWORK STATS</span>
+          <ArrowRight className="h-4 w-4" />
+        </a>
       </div>
     </main>
   );

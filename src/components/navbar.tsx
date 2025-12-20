@@ -38,7 +38,7 @@ export function Navbar() {
               <span className="text-xl font-bold text-[#E5E7EB]">X</span>
             </div>
             <span className="text-lg font-semibold tracking-tight text-[#E5E7EB]">
-              Xandeum Analytics
+              Xandeum
             </span>
           </Link>
 
@@ -71,7 +71,7 @@ export function Navbar() {
             <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-[#6B7280]" />
             <Input
               type="search"
-              placeholder="search by Pubkey, Ip address..."
+              placeholder="search by pubkey, ip address..."
               className="h-11 w-72 border-white/10 bg-white/5 pl-10 text-base text-[#E5E7EB] placeholder:text-[#6B7280] focus:border-white/20 focus:bg-white/10"
             />
           </div>
