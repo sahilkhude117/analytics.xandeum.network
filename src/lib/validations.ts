@@ -1,6 +1,31 @@
 import { z } from "zod";
 import { Status } from "../../prisma/generated/client";
 
+// API Query Schemas
+export const NetworkQuerySchema = z.object({
+  refresh: z
+    .string()
+    .optional()
+    .transform((val) => val === "true"),
+});
+
+export const PNodeQuerySchema = z.object({
+  refresh: z
+    .string()
+    .optional()
+    .transform((val) => val === "true"),
+});
+
+export const PaginationSchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  pageSize: z.coerce.number().int().positive().max(100).default(20),
+});
+
+export const SearchSchema = z.object({
+  query: z.string().min(1).max(100),
+  type: z.enum(["pubkey", "ip", "country"]).optional(),
+});
+
 export const PNodeListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(200).default(20),
