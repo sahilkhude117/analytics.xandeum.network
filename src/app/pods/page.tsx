@@ -1,8 +1,8 @@
 "use client";
 
 import { PodsTable } from "@/components/tables/pods-table";
+import { useState, useEffect } from "react";
 
-// Mock data - 50 pods with varied characteristics
 const generateMockPods = () => {
   const statuses = ["ONLINE", "DEGRADED", "OFFLINE", "INVALID"] as const;
   const visibilities = ["PUBLIC", "PRIVATE"] as const;
@@ -45,15 +45,22 @@ const generateMockPods = () => {
   return pods;
 };
 
-// Generate mock data once outside component to prevent regeneration on every render
 const mockPodsData = generateMockPods();
 
 export default function PodsPage() {
+  const [isLoading, setIsLoading] = useState(true);
   const mockPods = mockPodsData;
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, []);
 
   return (
     <main className="container mx-auto px-6 py-8">
-      {/* Page Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-[#E5E7EB]">Pods</h1>
         <p className="mt-1 text-sm text-[#9CA3AF]">
@@ -62,7 +69,7 @@ export default function PodsPage() {
       </div>
 
       {/* Table */}
-      <PodsTable data={mockPods} />
+      <PodsTable data={mockPods} isLoading={isLoading} />
     </main>
   );
 }

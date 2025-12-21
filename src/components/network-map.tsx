@@ -5,13 +5,14 @@ import { ComposableMap, Geographies, Geography, Marker } from 'react-simple-maps
 import { motion, AnimatePresence } from 'framer-motion';
 import { geoMercator } from 'd3-geo';
 import { mockPods } from '@/lib/mockPods';
+import { STATUS_COLORS } from '@/lib/constants/colors';
 
-// Status colors matching the dashboard theme
+// Map-friendly status color mapping (mockPods use lowercase status)
 const statusColors = {
-  online: '#22C55E',    // green
-  degraded: '#FACC15',  // yellow
-  offline: '#EF4444',   // red
-  invalid: '#8B5CF6'    // purple
+  online: STATUS_COLORS.ONLINE.dot,
+  degraded: STATUS_COLORS.DEGRADED.dot,
+  offline: STATUS_COLORS.OFFLINE.dot,
+  invalid: STATUS_COLORS.INVALID.dot,
 };
 
 // Dotted map data - multiple cities per country for better coverage

@@ -1,5 +1,6 @@
 "use client";
 
+import React, { useMemo, useCallback } from "react";
 import {
   LineChart,
   Line,
@@ -9,6 +10,8 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import { BaseChartContainer } from "./base-chart-container";
+import { getDefaultTooltipStyle, getDefaultAxisStyle } from "../../lib/chart-utils";
 
 interface StorageUtilizationChartProps {
   data?: Array<{
@@ -28,33 +31,32 @@ const defaultData = [
   { date: "Dec 19", committed: 172.6, used: 108.4 },
 ];
 
-export function StorageUtilizationChart({
+export const StorageUtilizationChart = React.memo<StorageUtilizationChartProps>(({
   data = defaultData,
-}: StorageUtilizationChartProps) {
+}) => {
+  const tooltip = useMemo(() => getDefaultTooltipStyle(), []);
+  const axis = useMemo(() => getDefaultAxisStyle(), []);
+
+  const tooltipFormatter = useCallback((value: number | undefined) => [`${value?.toFixed(1) ?? 0} TB`, ""], []);
+
+  const legend = useMemo(() => [{ color: "#1E40AF", label: "Committed" }, { color: "#FACC15", label: "Used" }], []);
+
   return (
-    <div className="rounded-lg border border-white/5 bg-[#0b0b0b] p-6">
-      <div className="mb-6">
-        <h3 className="text-xs font-medium uppercase tracking-wide text-[#6B7280]">
-          Storage Utilization Trend
-        </h3>
-        <p className="mt-1 text-sm text-[#9CA3AF]">
-          Last 7 days · Committed vs Used
-        </p>
-      </div>
+    <BaseChartContainer
+      title="Storage Utilization Trend"
+      description="Last 7 days · Committed vs Used"
+      legend={legend}
+    >
       <ResponsiveContainer width="100%" height={300}>
         <LineChart
           data={data}
           margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
         >
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-          <XAxis
-            dataKey="date"
-            stroke="#6B7280"
-            style={{ fontSize: "12px" }}
-          />
+          <XAxis dataKey="date" stroke={axis.stroke} style={axis.style} />
           <YAxis
-            stroke="#6B7280"
-            style={{ fontSize: "12px" }}
+            stroke={axis.stroke}
+            style={axis.style}
             label={{
               value: "Storage (TB)",
               angle: -90,
@@ -63,14 +65,9 @@ export function StorageUtilizationChart({
             }}
           />
           <Tooltip
-            contentStyle={{
-              backgroundColor: "#0A0A0A",
-              border: "1px solid rgba(255,255,255,0.1)",
-              borderRadius: "8px",
-              color: "#E5E7EB",
-            }}
-            labelStyle={{ color: "#9CA3AF", marginBottom: "4px" }}
-            formatter={(value: number | undefined) => [`${value?.toFixed(1) ?? 0} TB`, ""]}
+            contentStyle={{ ...tooltip.contentStyle, border: "1px solid rgba(255,255,255,0.1)" }}
+            labelStyle={tooltip.labelStyle}
+            formatter={tooltipFormatter}
           />
           <Line
             type="monotone"
@@ -92,16 +89,6 @@ export function StorageUtilizationChart({
           />
         </LineChart>
       </ResponsiveContainer>
-      <div className="mt-4 flex items-center justify-center gap-6 text-sm">
-        <div className="flex items-center gap-2">
-          <div className="h-3 w-3 rounded-sm bg-[#1E40AF]" />
-          <span className="text-[#9CA3AF]">Committed</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="h-3 w-3 rounded-sm bg-[#FACC15]" />
-          <span className="text-[#9CA3AF]">Used</span>
-        </div>
-      </div>
-    </div>
+    </BaseChartContainer>
   );
-}
+});

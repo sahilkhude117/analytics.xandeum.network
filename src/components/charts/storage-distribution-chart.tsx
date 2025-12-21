@@ -1,6 +1,9 @@
 "use client";
 
+import React, { useMemo, useCallback } from "react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { BaseChartContainer } from "./base-chart-container";
+import { getDefaultTooltipStyle, getDefaultAxisStyle } from "../../lib/chart-utils";
 
 interface StorageDistributionChartProps {
   data?: Array<{
@@ -18,8 +21,11 @@ const defaultData = [
   { range: '500+ GB', count: 22 },
 ];
 
-export function StorageDistributionChart({ data = defaultData }: StorageDistributionChartProps) {
-  const CustomTooltip = ({ active, payload }: any) => {
+export const StorageDistributionChart = React.memo<StorageDistributionChartProps>(({ data = defaultData }) => {
+  const tooltip = useMemo(() => getDefaultTooltipStyle(), []);
+  const axis = useMemo(() => getDefaultAxisStyle(), []);
+
+  const CustomTooltip = useCallback(({ active, payload }: any) => {
     if (!active || !payload?.length) return null;
 
     const { range, count } = payload[0].payload;
@@ -37,17 +43,11 @@ export function StorageDistributionChart({ data = defaultData }: StorageDistribu
         <div><strong>Pods:</strong> {count}</div>
       </div>
     );
-  };
+  }, []);
 
   return (
-    <div className="rounded-lg border border-white/5 bg-[#0b0b0b] p-6">
-
-      <h3 className="text-xs font-medium uppercase tracking-wide text-[#6B7280] mb-6">
-         Storage Distribution by Size Range
-      </h3>
-
-      <div style={{ width: "100%", height: 320 }}>
-        <ResponsiveContainer>
+    <BaseChartContainer title="Storage Distribution by Size Range">
+      <ResponsiveContainer width="100%" height={320}>
           <BarChart
             data={data}
             layout="vertical"
@@ -68,7 +68,12 @@ export function StorageDistributionChart({ data = defaultData }: StorageDistribu
               tickLine={false}
             />
 
-            <Tooltip content={<CustomTooltip />} cursor={{ fill: '#0f0f0f' }} />
+            <Tooltip
+              content={<CustomTooltip />}
+              contentStyle={tooltip.contentStyle}
+              labelStyle={tooltip.labelStyle}
+              cursor={{ fill: '#0f0f0f' }}
+            />
 
             <Bar
               dataKey="count"
@@ -77,7 +82,6 @@ export function StorageDistributionChart({ data = defaultData }: StorageDistribu
             />
           </BarChart>
         </ResponsiveContainer>
-      </div>
-    </div>
+    </BaseChartContainer>
   );
-}
+});

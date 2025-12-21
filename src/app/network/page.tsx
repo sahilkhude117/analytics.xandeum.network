@@ -1,14 +1,30 @@
-import NetworkMapWrapper from '@/components/NetworkMapWrapper';
-import { TotalPods, NetworkStats } from '@/components/NetworkStats';
-import { KpiCard } from '@/components/ui/kpi-card';
+"use client";
+
+import NetworkMapWrapper from '@/components/network-map-wrapper';
+import { TotalPods, NetworkStats } from '@/components/network-stats';
+import { KpiCard } from '@/components/kpi-card';
 import { NetworkHealthChart } from '@/components/charts/network-health-chart';
 import { VersionDistributionChart } from '@/components/charts/version-distribution-chart';
 import { StorageDistributionChart } from '@/components/charts/storage-distribution-chart';
 import { PodsGrowthChart } from '@/components/charts/pods-growth-chart';
-import { AdvancedMetricsSection } from '@/components/AdvancedMetricsSection';
+import { AdvancedMetricsSection } from '@/components/advanced-metrics-section';
 import { mockPods } from '@/lib/mockPods';
+import { useState, useEffect } from 'react';
+import KpiCardSkeleton  from '@/components/skeletons/kpi-card-skeleton';
+import ChartSkeleton from '@/components/skeletons/chart-skeleton';
 
 export default function NetworkPage() {
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // Simulate loading time
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, []);
+
   // Calculate KPI metrics
   const avgStorageCommitted = (mockPods.reduce((sum, pod) => sum + pod.storageCommitted, 0) / mockPods.length).toFixed(1);
   const avgStorageUsed = (mockPods.reduce((sum, pod) => sum + pod.storageUsed, 0) / mockPods.length).toFixed(1);
@@ -117,31 +133,37 @@ export default function NetworkPage() {
 
           {/* KPI Cards Section - Mobile */}
           <div className="mt-6 grid grid-cols-2 gap-4">
-            <KpiCard
-              title="Storage Committed"
-              value={`${avgStorageCommitted} GB`}
-            />
-            <KpiCard
-              title="Storage Used"
-              value={`${avgStorageUsed} GB`}
-            />
-            <KpiCard
-              title="Avg Usage"
-              value={`${avgUsagePercent}%`}
-              subtitle="utilization"
-            />
-            <KpiCard
-              title="Avg Uptime"
-              value={`${avgUptime} days`}
-            />
-            <KpiCard
-              title="Network Health"
-              value={`${avgHealth}%`}
-            />
-            <KpiCard
-              title="Public / Private Pods"
-              value={`${publicCount} / ${privateCount}`}
-            />
+            {isLoading ? (
+              Array.from({ length: 6 }).map((_, i) => <KpiCardSkeleton key={i} />)
+            ) : (
+              <>
+                <KpiCard
+                  title="Storage Committed"
+                  value={`${avgStorageCommitted} GB`}
+                />
+                <KpiCard
+                  title="Storage Used"
+                  value={`${avgStorageUsed} GB`}
+                />
+                <KpiCard
+                  title="Avg Usage"
+                  value={`${avgUsagePercent}%`}
+                  subtitle="utilization"
+                />
+                <KpiCard
+                  title="Avg Uptime"
+                  value={`${avgUptime} days`}
+                />
+                <KpiCard
+                  title="Network Health"
+                  value={`${avgHealth}%`}
+                />
+                <KpiCard
+                  title="Public / Private Pods"
+                  value={`${publicCount} / ${privateCount}`}
+                />
+              </>
+            )}
           </div>
         </div>
 
@@ -170,49 +192,55 @@ export default function NetworkPage() {
 
         {/* KPI Cards Section */}
         <div className="mt-8 grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
-          <KpiCard
-            title="Avg Storage Committed"
-            value={`${avgStorageCommitted} GB`}
-          />
-          <KpiCard
-            title="Avg Storage Used"
-            value={`${avgStorageUsed} GB`}
-          />
-          <KpiCard
-            title="Avg Usage"
-            value={`${avgUsagePercent}%`}
-            subtitle="utilization"
-          />
-          <KpiCard
-            title="Avg Uptime"
-            value={`${avgUptime} days`}
-          />
-          <KpiCard
-            title="Avg Health"
-            value={`${avgHealth}%`}
-          />
-          <KpiCard
-            title="Public / Private Pods"
-            value={`${publicCount} / ${privateCount}`}
-          />
+          {isLoading ? (
+            Array.from({ length: 6 }).map((_, i) => <KpiCardSkeleton key={i} />)
+          ) : (
+            <>
+              <KpiCard
+                title="Avg Storage Committed"
+                value={`${avgStorageCommitted} GB`}
+              />
+              <KpiCard
+                title="Avg Storage Used"
+                value={`${avgStorageUsed} GB`}
+              />
+              <KpiCard
+                title="Avg Usage"
+                value={`${avgUsagePercent}%`}
+                subtitle="utilization"
+              />
+              <KpiCard
+                title="Avg Uptime"
+                value={`${avgUptime} days`}
+              />
+              <KpiCard
+                title="Avg Health"
+                value={`${avgHealth}%`}
+              />
+              <KpiCard
+                title="Public / Private Pods"
+                value={`${publicCount} / ${privateCount}`}
+              />
+            </>
+          )}
         </div>
 
         {/* Charts Section */}
         <div className="mt-8 grid grid-cols-1 gap-4 lg:grid-cols-3">
           <div className="lg:col-span-2">
-            <NetworkHealthChart />
+            {isLoading ? <ChartSkeleton /> : <NetworkHealthChart />}
           </div>
           <div className="lg:col-span-1">
-            <VersionDistributionChart data={versionData} />
+            {isLoading ? <ChartSkeleton /> : <VersionDistributionChart data={versionData} />}
           </div>
         </div>
 
         {/* Storage Distribution Section */}
         <div className="mt-4">
-          <StorageDistributionChart data={storageData} />
+          {isLoading ? <ChartSkeleton /> : <StorageDistributionChart data={storageData} />}
         </div>
         <div className="mt-6 mb-6">
-          <PodsGrowthChart />
+          {isLoading ? <ChartSkeleton /> : <PodsGrowthChart />}
         </div>
 
         {/* Advanced Metrics Section */}

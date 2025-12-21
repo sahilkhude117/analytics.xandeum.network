@@ -1,5 +1,6 @@
 "use client";
 
+import React, { useMemo, useCallback } from "react";
 import {
   LineChart,
   Line,
@@ -9,6 +10,8 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import { BaseChartContainer } from "./base-chart-container";
+import { getDefaultTooltipStyle, getDefaultAxisStyle } from "../../lib/chart-utils";
 
 interface NetworkTrafficChartProps {
   data?: Array<{ time: string; bytes: number }>;
@@ -24,23 +27,27 @@ const defaultData = [
   { time: "Dec 21", bytes: 658 },
 ];
 
-export function NetworkTrafficChart({ data = defaultData }: NetworkTrafficChartProps) {
-  return (
-    <div className="rounded-lg border border-white/5 bg-[#0b0b0b] p-6">
-      <div className="mb-6">
-        <h3 className="text-xs font-medium uppercase tracking-wide text-[#6B7280]">
-          Network Traffic Over Time
-        </h3>
-        <p className="mt-1 text-sm text-[#9CA3AF]">Total bytes transmitted</p>
-      </div>
+export const NetworkTrafficChart = React.memo<NetworkTrafficChartProps>(({ data = defaultData }) => {
+  const tooltip = useMemo(() => getDefaultTooltipStyle(), []);
+  const axis = useMemo(() => getDefaultAxisStyle(), []);
 
+  const tooltipFormatter = useCallback((value: number | undefined) => [`${value ?? "N/A"} GB`, "Total Bytes"], []);
+
+  const legend = useMemo(() => [{ color: "#22C55E", label: "Total Bytes" }], []);
+
+  return (
+    <BaseChartContainer
+      title="Network Traffic Over Time"
+      description="Total bytes transmitted"
+      legend={legend}
+    >
       <ResponsiveContainer width="100%" height={300}>
         <LineChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" />
-          <XAxis dataKey="time" stroke="#6B7280" style={{ fontSize: "12px" }} />
+          <XAxis dataKey="time" stroke={axis.stroke} style={axis.style} />
           <YAxis
-            stroke="#6B7280"
-            style={{ fontSize: "12px" }}
+            stroke={axis.stroke}
+            style={axis.style}
             label={{
               value: "Total Bytes (GB)",
               angle: -90,
@@ -49,14 +56,9 @@ export function NetworkTrafficChart({ data = defaultData }: NetworkTrafficChartP
             }}
           />
           <Tooltip
-            contentStyle={{
-              backgroundColor: "#0A0A0A",
-              border: "1px solid rgba(255,255,255,0.06)",
-              borderRadius: 8,
-              color: "#E5E7EB",
-            }}
-            labelStyle={{ color: "#9CA3AF", marginBottom: "4px" }}
-            formatter={(value: number | undefined) => [`${value ?? "N/A"} GB`, "Total Bytes"]}
+            contentStyle={tooltip.contentStyle}
+            labelStyle={tooltip.labelStyle}
+            formatter={tooltipFormatter}
           />
           <Line
             type="monotone"
@@ -68,11 +70,6 @@ export function NetworkTrafficChart({ data = defaultData }: NetworkTrafficChartP
           />
         </LineChart>
       </ResponsiveContainer>
-
-      <div className="mt-4 flex items-center justify-center gap-2 text-sm">
-        <div className="h-3 w-3 rounded-sm bg-[#22C55E]" />
-        <span className="text-[#9CA3AF]">Total Bytes</span>
-      </div>
-    </div>
+    </BaseChartContainer>
   );
-}
+});

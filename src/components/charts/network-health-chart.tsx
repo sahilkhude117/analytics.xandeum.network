@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import {
   LineChart,
   Line,
@@ -10,8 +10,9 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-
-type TimeRange = "24h" | "7d" | "30d";
+import { BaseChartContainer } from "./base-chart-container";
+import { getDefaultTooltipStyle, getDefaultAxisStyle } from "../../lib/chart-utils";
+import { useChartData, TimeRange } from "../../hooks/use-chart-data";
 
 const mockData = {
   "24h": [
@@ -43,51 +44,54 @@ const mockData = {
   ],
 };
 
-export function NetworkHealthChart() {
-  const [timeRange, setTimeRange] = useState<TimeRange>("7d");
-  const data = mockData[timeRange];
+export const NetworkHealthChart = React.memo(() => {
+  const { currentData, timeRange, setTimeRange, timeRangeOptions } = useChartData(mockData);
+
+  const tooltip = useMemo(() => getDefaultTooltipStyle(), []);
+  const axis = useMemo(() => getDefaultAxisStyle(), []);
+
+  const legend = useMemo(() => [{ color: "#FACC15", label: "Health Score" }], []);
+
+  const handleTimeRangeChange = useCallback((range: TimeRange) => {
+    setTimeRange(range);
+  }, [setTimeRange]);
+
+  const tooltipFormatter = useCallback((value: number | undefined) => [`${value ?? 'N/A'}%`, "Health Score"], []);
+
+  const timeRangeButtons = useMemo(() =>
+    timeRangeOptions.map((range) => (
+      <button
+        key={range}
+        onClick={() => handleTimeRangeChange(range)}
+        className={`rounded px-3 py-1 text-xs font-medium transition-colors ${
+          timeRange === range
+            ? "bg-[#FACC15] text-black"
+            : "bg-white/5 text-[#9CA3AF] hover:bg-white/10"
+        }`}
+      >
+        {range}
+      </button>
+    )), [timeRange, timeRangeOptions, handleTimeRangeChange]);
 
   return (
-    <div className="rounded-lg border border-white/5 bg-[#0b0b0b] p-6">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h3 className="text-xs font-medium uppercase tracking-wide text-[#6B7280]">
-            Network Health Growth
-          </h3>
-          <p className="mt-1 text-sm text-[#9CA3AF]">
-            Health score trend over time
-          </p>
-        </div>
+    <BaseChartContainer
+      title="Network Health Growth"
+      description="Health score trend over time"
+      legend={legend}
+    >
+      <div className="mb-2 flex items-center justify-end">
         <div className="flex gap-2">
-          {(["24h", "7d", "30d"] as TimeRange[]).map((range) => (
-            <button
-              key={range}
-              onClick={() => setTimeRange(range)}
-              className={`rounded px-3 py-1 text-xs font-medium transition-colors ${
-                timeRange === range
-                  ? "bg-[#FACC15] text-black"
-                  : "bg-white/5 text-[#9CA3AF] hover:bg-white/10"
-              }`}
-            >
-              {range}
-            </button>
-          ))}
+          {timeRangeButtons}
         </div>
       </div>
+
       <ResponsiveContainer width="100%" height={300}>
-        <LineChart
-          data={data}
-          margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-        >
+        <LineChart data={currentData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-          <XAxis
-            dataKey="time"
-            stroke="#6B7280"
-            style={{ fontSize: "12px" }}
-          />
+          <XAxis dataKey="time" stroke={axis.stroke} style={axis.style} />
           <YAxis
-            stroke="#6B7280"
-            style={{ fontSize: "12px" }}
+            stroke={axis.stroke}
+            style={axis.style}
             domain={[0, 100]}
             label={{
               value: "Health Score (%)",
@@ -98,13 +102,11 @@ export function NetworkHealthChart() {
           />
           <Tooltip
             contentStyle={{
-              backgroundColor: "#0A0A0A",
+              ...tooltip.contentStyle,
               border: "1px solid rgba(255,255,255,0.1)",
-              borderRadius: "8px",
-              color: "#E5E7EB",
             }}
-            labelStyle={{ color: "#9CA3AF", marginBottom: "4px" }}
-            formatter={(value: number | undefined) => [`${value ?? 'N/A'}%`, "Health Score"]}
+            labelStyle={tooltip.labelStyle}
+            formatter={tooltipFormatter}
           />
           <Line
             type="monotone"
@@ -116,10 +118,6 @@ export function NetworkHealthChart() {
           />
         </LineChart>
       </ResponsiveContainer>
-      <div className="mt-4 flex items-center justify-center gap-2 text-sm">
-        <div className="h-3 w-3 rounded-sm bg-[#FACC15]" />
-        <span className="text-[#9CA3AF]">Health Score</span>
-      </div>
-    </div>
+    </BaseChartContainer>
   );
-}
+});

@@ -1,10 +1,7 @@
 'use client';
 
 import { mockPods } from '@/lib/mockPods';
-
-function formatNumber(num: number): string {
-  return num.toLocaleString('en-US');
-}
+import { formatNumber } from '@/lib/formatters';
 
 export function TotalPods() {
   const totalPods = mockPods.length;

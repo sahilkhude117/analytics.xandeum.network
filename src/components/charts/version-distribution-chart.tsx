@@ -1,6 +1,9 @@
 "use client";
 
+import React, { useMemo, useCallback } from "react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
+import { BaseChartContainer } from "./base-chart-container";
+import { getDefaultTooltipStyle } from "../../lib/chart-utils";
 
 interface VersionDistributionChartProps {
   data?: Array<{
@@ -18,10 +21,13 @@ const defaultData = [
   { name: "1.0.0", value: 1, color: "#EF4444" }, // red
 ];
 
-export function VersionDistributionChart({ data = defaultData }: VersionDistributionChartProps) {
-  const total = data.reduce((sum, entry) => sum + entry.value, 0);
+export const VersionDistributionChart = React.memo<VersionDistributionChartProps>(({ data = defaultData }) => {
+  const total = useMemo(() => data.reduce((sum, entry) => sum + entry.value, 0), [data]);
+  const tooltip = useMemo(() => getDefaultTooltipStyle(), []);
 
-  const CustomTooltip = ({ active, payload }: any) => {
+  const legend = useMemo(() => data.map((d) => ({ color: d.color, label: d.name })), [data]);
+
+  const CustomTooltip = useCallback(({ active, payload }: any) => {
     if (active && payload && payload.length) {
       const entry = payload[0];
       const percentage = ((entry.value / total) * 100).toFixed(1);
@@ -35,16 +41,14 @@ export function VersionDistributionChart({ data = defaultData }: VersionDistribu
       );
     }
     return null;
-  };
+  }, [total]);
 
   return (
-    <div className="rounded-lg border border-white/5 bg-[#0b0b0b] p-4">
-      <div className="mb-4">
-        <h3 className="text-xs font-medium uppercase tracking-wide text-[#6B7280]">
-          Version Distribution
-        </h3>
-        <p className="mt-1 text-sm text-[#9CA3AF]">Total: {total} nodes</p>
-      </div>
+    <BaseChartContainer
+      title="Version Distribution"
+      description={`Total: ${total} nodes`}
+      legend={legend}
+    >
       <ResponsiveContainer width="100%" height={300}>
         <PieChart>
           <Pie
@@ -63,19 +67,6 @@ export function VersionDistributionChart({ data = defaultData }: VersionDistribu
           <Tooltip content={<CustomTooltip />} />
         </PieChart>
       </ResponsiveContainer>
-      
-      {/* Color Guide (2 columns, names only) */}
-      <div className="mt-6 grid grid-cols-3 gap-1">
-        {data.map((entry, index) => (
-          <div key={index} className="flex items-center gap-1 text-sm">
-            <div
-              className="h-3 w-3 rounded-sm flex-shrink-0"
-              style={{ backgroundColor: entry.color }}
-            />
-            <span className="text-[#9CA3AF] text-xs truncate">{entry.name}</span>
-          </div>
-        ))}
-      </div>
-    </div>
+    </BaseChartContainer>
   );
-}
+});

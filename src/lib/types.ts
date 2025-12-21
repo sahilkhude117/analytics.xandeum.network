@@ -236,3 +236,52 @@ export interface LiveNodeStats {
   currentIndex: number;
   lastUpdated: string;
 }
+
+// Pod Details Page Types
+export type Visibility = "PUBLIC" | "PRIVATE";
+
+export interface PodDetails {
+  // Always available
+  pubkey: string;
+  ip: string;
+  gossipPort: number;
+  version: string;
+  status: Status;
+  rpcPort: number;
+  visibility: Visibility;
+  storageCommitted: number; // GB
+  storageUsed: number; // GB
+  uptime: number; // seconds
+  healthScore: number;
+  lastSeen: Date;
+  firstSeen: Date;
+  city?: string;
+  country?: string;
+
+  // Public node only
+  cpuPercent?: number;
+  ramUsed?: number;
+  ramTotal?: number;
+  activeStreams?: number;
+  packetsSent?: number;
+  packetsReceived?: number;
+  totalBytes?: number;
+  totalPages?: number;
+  currentIndex?: number;
+
+  // Time series data
+  storageHistory: Array<{
+    timestamp: Date;
+    committed: number;
+    used: number;
+  }>;
+  cpuHistory?: Array<{
+    timestamp: Date;
+    percent: number;
+  }>;
+  ramHistory?: Array<{
+    timestamp: Date;
+    used: number;
+    total: number;
+  }>;
+}

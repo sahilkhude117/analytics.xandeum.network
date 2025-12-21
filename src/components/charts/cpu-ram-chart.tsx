@@ -1,5 +1,6 @@
 "use client";
 
+import React, { useMemo, useCallback } from "react";
 import {
   LineChart,
   Line,
@@ -9,6 +10,8 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import { BaseChartContainer } from "./base-chart-container";
+import { getDefaultTooltipStyle, getDefaultAxisStyle } from "../../lib/chart-utils";
 
 interface CpuRamChartProps {
   data?: Array<{ time: string; cpu: number; ram: number }>;
@@ -24,23 +27,30 @@ const defaultData = [
   { time: "Now", cpu: 47, ram: 42 },
 ];
 
-export function CpuRamChart({ data = defaultData }: CpuRamChartProps) {
-  return (
-    <div className="rounded-lg border border-white/5 bg-[#0b0b0b] p-6">
-      <div className="mb-6">
-        <h3 className="text-xs font-medium uppercase tracking-wide text-[#6B7280]">
-          CPU & RAM Over Time
-        </h3>
-        <p className="mt-1 text-sm text-[#9CA3AF]">Resource utilization trends</p>
-      </div>
+export const CpuRamChart = React.memo<CpuRamChartProps>(({ data = defaultData }) => {
+  const tooltip = useMemo(() => getDefaultTooltipStyle(), []);
+  const axis = useMemo(() => getDefaultAxisStyle(), []);
 
+  const tooltipFormatter = useCallback((value: number | undefined) => [`${value ?? "N/A"}%`], []);
+
+  const legend = useMemo(() => [
+    { color: "#3B82F6", label: "CPU" },
+    { color: "#FACC15", label: "RAM" }
+  ], []);
+
+  return (
+    <BaseChartContainer
+      title="CPU & RAM Over Time"
+      description="Resource utilization trends"
+      legend={legend}
+    >
       <ResponsiveContainer width="100%" height={300}>
         <LineChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" />
-          <XAxis dataKey="time" stroke="#6B7280" style={{ fontSize: "12px" }} />
+          <XAxis dataKey="time" stroke={axis.stroke} style={axis.style} />
           <YAxis
-            stroke="#6B7280"
-            style={{ fontSize: "12px" }}
+            stroke={axis.stroke}
+            style={axis.style}
             domain={[0, 100]}
             label={{
               value: "Utilization (%)",
@@ -50,16 +60,10 @@ export function CpuRamChart({ data = defaultData }: CpuRamChartProps) {
             }}
           />
           <Tooltip
-            contentStyle={{
-              backgroundColor: "#0A0A0A",
-              border: "1px solid rgba(255,255,255,0.06)",
-              borderRadius: 8,
-              color: "#E5E7EB",
-            }}
-            labelStyle={{ color: "#9CA3AF", marginBottom: "4px" }}
-            formatter={(value: number | undefined) => [`${value ?? "N/A"}%`]}
+            contentStyle={tooltip.contentStyle}
+            labelStyle={tooltip.labelStyle}
+            formatter={tooltipFormatter}
           />
-          {/* Legend replaced by colored chips below for consistent styling */}
           <Line
             type="monotone"
             dataKey="cpu"
@@ -78,12 +82,6 @@ export function CpuRamChart({ data = defaultData }: CpuRamChartProps) {
           />
         </LineChart>
       </ResponsiveContainer>
-      <div className="mt-4 flex items-center justify-center gap-2 text-sm">
-        <div className="h-3 w-3 rounded-sm bg-[#3B82F6]" />
-        <span className="text-[#9CA3AF]">CPU</span>
-        <div className="h-3 w-3 rounded-sm bg-[#FACC15] ml-4" />
-        <span className="text-[#9CA3AF]">RAM</span>
-      </div>
-    </div>
+    </BaseChartContainer>
   );
-}
+});

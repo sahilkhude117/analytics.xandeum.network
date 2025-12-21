@@ -19,6 +19,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { STATUS_COLORS } from '@/lib/constants/colors';
+import { formatUptime, formatRelativeTime, getHealthColor } from '@/lib/formatters';
+import TableSkeleton from '@/components/skeletons/table-skeleton';
+import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard';
+import { useDebounce } from '@/hooks/use-debounce';
 
 type Status = "ONLINE" | "DEGRADED" | "OFFLINE" | "INVALID";
 type Visibility = "PUBLIC" | "PRIVATE";
@@ -49,50 +54,16 @@ interface PodsTableProps {
   hasMore?: boolean;
 }
 
-type CopiedField = { id: string; field: "pubkey" | "ip" } | null;
-
 const columnHelper = createColumnHelper<Pod>();
 
-// Status colors matching home page
-const statusColors: Record<Status, { dot: string; text: string; bg: string }> = {
-  ONLINE: { dot: "#22C55E", text: "#22C55E", bg: "#22C55E20" },
-  DEGRADED: { dot: "#FACC15", text: "#FACC15", bg: "#FACC1520" },
-  OFFLINE: { dot: "#EF4444", text: "#EF4444", bg: "#EF444420" },
-  INVALID: { dot: "#6B7280", text: "#6B7280", bg: "#6B728020" },
-};
+// Status colors (centralized)
+const statusColors = STATUS_COLORS;
 
-// Health score colors
-const getHealthColor = (score: number) => {
-  if (score >= 80) return "#22C55E";
-  if (score >= 50) return "#FACC15";
-  return "#EF4444";
-};
-
-// Format uptime
-const formatUptime = (seconds: number) => {
-  const days = Math.floor(seconds / 86400);
-  const hours = Math.floor((seconds % 86400) / 3600);
-  if (days > 0) return `${days}d ${hours}h`;
-  const minutes = Math.floor((seconds % 3600) / 60);
-  if (hours > 0) return `${hours}h ${minutes}m`;
-  return `${minutes}m`;
-};
-
-// Format relative time
-const formatRelativeTime = (date: Date) => {
-  const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
-  if (seconds < 60) return `${seconds}s ago`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
-};
+// Health and formatting utilities imported from shared lib
 
 const createColumns = (
-  copiedField: CopiedField,
-  handleCopy: (text: string, id: string, field: "pubkey" | "ip") => void,
+  isCopied: (id: string, field: string) => boolean,
+  copyToClipboard: (text: string, id: string, field: string) => void,
   storageSortMethod: 'committed' | 'used' | 'percent',
   setStorageSortMethod: (method: 'committed' | 'used' | 'percent') => void
 ) => [
@@ -128,7 +99,7 @@ const createColumns = (
     cell: (info) => {
       const pubkey = info.getValue();
       const id = info.row.original.id;
-      const isCopied = copiedField?.id === id && copiedField?.field === "pubkey";
+      const copied = isCopied(id, "pubkey");
       return (
         <div className="flex items-center gap-2">
           <span
@@ -140,12 +111,12 @@ const createColumns = (
           <button
             onClick={(e) => {
               e.stopPropagation();
-              handleCopy(pubkey, id, "pubkey");
+              copyToClipboard(pubkey, id, "pubkey");
             }}
             className="opacity-0 group-hover:opacity-100 transition-opacity"
             title="Copy pubkey"
           >
-            {isCopied ? (
+            {copied ? (
               <Check className="h-3 w-3 text-[#22C55E]" />
             ) : (
               <Copy className="h-3 w-3 text-[#9CA3AF] hover:text-[#1E40AF]" />
@@ -162,7 +133,7 @@ const createColumns = (
       const ip = info.getValue();
       const port = info.row.original.port;
       const id = info.row.original.id;
-      const isCopied = copiedField?.id === id && copiedField?.field === "ip";
+      const copied = isCopied(id, "ip");
       return (
         <div className="flex items-center gap-2">
           <span className="font-mono text-md text-[#9CA3AF]">
@@ -171,12 +142,12 @@ const createColumns = (
           <button
             onClick={(e) => {
               e.stopPropagation();
-              handleCopy(ip, id, "ip");
+              copyToClipboard(ip, id, "ip");
             }}
             className="opacity-0 group-hover:opacity-100 transition-opacity"
             title="Copy IP address"
           >
-            {isCopied ? (
+            {copied ? (
               <Check className="h-3 w-3 text-[#22C55E]" />
             ) : (
               <Copy className="h-3 w-3 text-[#9CA3AF] hover:text-[#1E40AF]" />
@@ -365,8 +336,10 @@ export function PodsTable({
     { id: "healthScore", desc: true },
   ]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-  const [copiedField, setCopiedField] = useState<CopiedField>(null);
   const [globalFilter, setGlobalFilter] = useState("");
+  const debouncedGlobalFilter = useDebounce(globalFilter, 300);
+  
+  const { copyToClipboard, isCopied } = useCopyToClipboard();
   
   useEffect(() => {
     setMounted(true);
@@ -384,21 +357,15 @@ export function PodsTable({
   const [storageUsageRange, setStorageUsageRange] = useState<[number, number]>([0, 100]);
   const [storageSortMethod, setStorageSortMethod] = useState<'committed' | 'used' | 'percent'>('committed');
 
-  const handleCopy = (text: string, id: string, field: "pubkey" | "ip") => {
-    navigator.clipboard.writeText(text);
-    setCopiedField({ id, field });
-    setTimeout(() => setCopiedField(null), 2000);
-  };
-
   const columns = useMemo(
     () =>
       createColumns(
-        copiedField,
-        handleCopy,
+        isCopied,
+        copyToClipboard,
         storageSortMethod,
         setStorageSortMethod
       ),
-    [copiedField, storageSortMethod]
+    [isCopied, copyToClipboard, storageSortMethod]
   );
 
   // Apply filters
@@ -406,8 +373,8 @@ export function PodsTable({
     let filtered = [...data];
 
     // Global search
-    if (globalFilter) {
-      const search = globalFilter.toLowerCase();
+    if (debouncedGlobalFilter) {
+      const search = debouncedGlobalFilter.toLowerCase();
       filtered = filtered.filter(
         (pod) =>
           pod.pubkey.toLowerCase().includes(search) ||
@@ -461,7 +428,7 @@ export function PodsTable({
     }
 
     return filtered;
-  }, [data, globalFilter, statusFilter, visibilityFilter, versionFilter, countryFilter, healthScoreRange, storageUsageRange]);
+  }, [data, debouncedGlobalFilter, statusFilter, visibilityFilter, versionFilter, countryFilter, healthScoreRange, storageUsageRange]);
 
   const table = useReactTable({
     data: filteredData,
@@ -810,7 +777,11 @@ export function PodsTable({
 
       {/* Table */}
       <div className="overflow-x-auto rounded-lg border border-white/5 bg-[#0b0b0b]">
-        {!mounted ? (
+        {isLoading ? (
+          <div className="p-6">
+            <TableSkeleton rows={10} />
+          </div>
+        ) : !mounted ? (
           <div className="w-full p-8">
             <div className="space-y-4">
               {Array.from({ length: 10 }).map((_, i) => (
@@ -902,7 +873,7 @@ export function PodsTable({
               ))
             )}
           </tbody>
-        </table>
+          </table>
         )}
       </div>
 

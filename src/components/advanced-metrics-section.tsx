@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect } from "react";
 import { ChevronUp, ChevronDown, Info } from "lucide-react";
-import { KpiCard } from "@/components/ui/kpi-card";
+import { KpiCard } from "@/components/kpi-card";
 import { CpuRamChart } from "@/components/charts/cpu-ram-chart";
 import { NetworkTrafficChart } from "@/components/charts/network-traffic-chart";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { toggleAdvancedMetrics, showTooltip, hideTooltip } from "@/store/uiSlice";
 
 interface AdvancedMetricsProps {
   avgCpu: number;
@@ -23,25 +25,26 @@ export function AdvancedMetricsSection({
   totalPacketsReceived,
   totalPages,
 }: AdvancedMetricsProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [showTooltip, setShowTooltip] = useState(false);
+  const dispatch = useAppDispatch();
+  const isExpanded = useAppSelector((s) => s.ui.advancedMetricsExpanded);
+  const showTooltipState = useAppSelector((s) => s.ui.tooltips["advanced-info"] ?? false);
 
   return (
     <div className="mt-8 mb-12">
       {/* Expand Button */}
       <div className="flex items-center justify-center">
         <button
-          onClick={() => setIsExpanded(!isExpanded)}
+          onClick={() => dispatch(toggleAdvancedMetrics())}
           className="flex items-center gap-3 rounded-lg border border-white/10 bg-[#0b0b0b] px-6 py-3 text-sm font-medium text-[#E5E7EB] transition-all hover:border-[#1E40AF] hover:bg-[#1E40AF]/10"
         >
           <span>Advanced Network Metrics (Public Nodes Only)</span>
           <div className="relative">
             <Info
               className="h-4 w-4 text-[#60A5FA] cursor-help"
-              onMouseEnter={() => setShowTooltip(true)}
-              onMouseLeave={() => setShowTooltip(false)}
+              onMouseEnter={() => dispatch(showTooltip("advanced-info"))}
+              onMouseLeave={() => dispatch(hideTooltip("advanced-info"))}
             />
-            {showTooltip && (
+            {showTooltipState && (
               <div className="absolute bottom-full right-0 mb-2 w-64 rounded-lg border border-[#60A5FA]/20 bg-[#0b1537] p-3 text-xs text-[#E5E7EB] shadow-lg z-50">
                 <p className="font-semibold text-[#60A5FA] mb-1">
                   Public Nodes Only

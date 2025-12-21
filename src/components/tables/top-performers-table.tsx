@@ -16,9 +16,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ChevronDown, Copy, Check } from "lucide-react";
+import TableSkeleton from "../skeletons/table-skeleton";
+import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 
 type SortOption = "reliability" | "storage" | "uptime";
-type CopiedField = { rowId: string; field: "pubkey" | "ip" } | null;
 
 interface PodPerformance {
   pubkey: string;
@@ -33,30 +34,31 @@ interface PodPerformance {
 
 interface TopPerformersTableProps {
   data?: PodPerformance[];
+  isLoading?: boolean;
 }
 
 const columnHelper = createColumnHelper<PodPerformance>();
 
 const createColumns = (
-  copiedField: CopiedField,
-  handleCopy: (text: string, rowId: string, field: "pubkey" | "ip") => void
+  isCopied: (rowId: string, field: string) => boolean,
+  copyToClipboard: (text: string, rowId: string, field: string) => void
 ) => [
   columnHelper.accessor("pubkey", {
     header: "Pubkey",
     cell: (info) => {
       const rowId = info.row.id;
-      const isCopied = copiedField?.rowId === rowId && copiedField?.field === "pubkey";
+      const copied = isCopied(rowId, "pubkey");
       return (
         <div className="flex items-center gap-2">
           <span className="font-mono text-md text-[#E5E7EB]">
             {info.getValue().slice(0, 8)}...{info.getValue().slice(-6)}
           </span>
           <button
-            onClick={() => handleCopy(info.getValue(), rowId, "pubkey")}
+            onClick={() => copyToClipboard(info.getValue(), rowId, "pubkey")}
             className="opacity-0 group-hover:opacity-100 transition-opacity"
             title="Copy pubkey"
           >
-            {isCopied ? (
+            {copied ? (
               <Check className="h-3.5 w-3.5 text-[#22C55E]" />
             ) : (
               <Copy className="h-3.5 w-3.5 text-[#9CA3AF] hover:text-[#1E40AF]" />
@@ -70,18 +72,18 @@ const createColumns = (
     header: "Address",
     cell: (info) => {
       const rowId = info.row.id;
-      const isCopied = copiedField?.rowId === rowId && copiedField?.field === "ip";
+      const copied = isCopied(rowId, "ip");
       return (
         <div className="flex items-center gap-2">
           <span className="font-mono text-md text-[#9CA3AF]">
             {info.getValue()}:9001
           </span>
           <button
-            onClick={() => handleCopy(info.getValue(), rowId, "ip")}
+            onClick={() => copyToClipboard(info.getValue(), rowId, "ip")}
             className="opacity-0 group-hover:opacity-100 transition-opacity"
             title="Copy IP address"
           >
-            {isCopied ? (
+            {copied ? (
               <Check className="h-3.5 w-3.5 text-[#22C55E]" />
             ) : (
               <Copy className="h-3.5 w-3.5 text-[#9CA3AF] hover:text-[#1E40AF]" />
@@ -357,15 +359,9 @@ const sortOptions: Record<SortOption, string> = {
   uptime: "Uptime",
 };
 
-export function TopPerformersTable({ data = defaultData }: TopPerformersTableProps) {
+export function TopPerformersTable({ data = defaultData, isLoading = false }: TopPerformersTableProps) {
   const [sortBy, setSortBy] = useState<SortOption>("reliability");
-  const [copiedField, setCopiedField] = useState<CopiedField>(null);
-
-  const handleCopy = (text: string, rowId: string, field: "pubkey" | "ip") => {
-    navigator.clipboard.writeText(text);
-    setCopiedField({ rowId, field });
-    setTimeout(() => setCopiedField(null), 2000);
-  };
+  const { copyToClipboard, isCopied } = useCopyToClipboard();
 
   // Sort and take top 10 based on selected option
   const sortedData = useMemo(() => {
@@ -387,8 +383,8 @@ export function TopPerformersTable({ data = defaultData }: TopPerformersTablePro
   const [sorting, setSorting] = useState<SortingState>([]);
 
   const columns = useMemo(
-    () => createColumns(copiedField, handleCopy),
-    [copiedField]
+    () => createColumns(isCopied, copyToClipboard),
+    [isCopied, copyToClipboard]
   );
 
   const table = useReactTable({
@@ -404,89 +400,95 @@ export function TopPerformersTable({ data = defaultData }: TopPerformersTablePro
 
   return (
     <div className="rounded-lg border border-white/5 bg-[#0b0b0b] p-6">
-      {/* Header with Dropdown */}
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-medium text-[#E5E7EB]">
-            Top 10 Pods by {sortOptions[sortBy]}
-          </h3>
-        </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger className="flex items-center gap-2 rounded-lg border border-white/10 bg-[#0A0A0A] px-4 py-2 text-sm text-[#E5E7EB] transition-colors hover:bg-white/5 focus:outline-none focus:ring-0">
-            {sortOptions[sortBy]}
-            <ChevronDown className="h-4 w-4 text-[#9CA3AF]" />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56 border-white/10 bg-[#0A0A0A]">
-            <DropdownMenuItem
-              onClick={() => setSortBy("reliability")}
-              className={`cursor-pointer text-sm ${
-                sortBy === "reliability"
-                  ? "bg-[#1E40AF] text-white"
-                  : "text-[#E5E7EB] hover:bg-white/5"
-              }`}
-            >
-              Reliability (Health)
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => setSortBy("storage")}
-              className={`cursor-pointer text-sm ${
-                sortBy === "storage"
-                  ? "bg-[#1E40AF] text-white"
-                  : "text-[#E5E7EB] hover:bg-white/5"
-              }`}
-            >
-              Storage Committed
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => setSortBy("uptime")}
-              className={`cursor-pointer text-sm ${
-                sortBy === "uptime"
-                  ? "bg-[#1E40AF] text-white"
-                  : "text-[#E5E7EB] hover:bg-white/5"
-              }`}
-            >
-              Uptime
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
-      {/* Table */}
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-white/5">
-              {table.getFlatHeaders().map((header) => (
-                <th
-                  key={header.id}
-                  className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-[#6B7280]"
+      {isLoading ? (
+        <TableSkeleton rows={10} />
+      ) : (
+        <>
+          {/* Header with Dropdown */}
+          <div className="mb-6 flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-medium text-[#E5E7EB]">
+                Top 10 Pods by {sortOptions[sortBy]}
+              </h3>
+            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger className="flex items-center gap-2 rounded-lg border border-white/10 bg-[#0A0A0A] px-4 py-2 text-sm text-[#E5E7EB] transition-colors hover:bg-white/5 focus:outline-none focus:ring-0">
+                {sortOptions[sortBy]}
+                <ChevronDown className="h-4 w-4 text-[#9CA3AF]" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56 border-white/10 bg-[#0A0A0A]">
+                <DropdownMenuItem
+                  onClick={() => setSortBy("reliability")}
+                  className={`cursor-pointer text-sm ${
+                    sortBy === "reliability"
+                      ? "bg-[#1E40AF] text-white"
+                      : "text-[#E5E7EB] hover:bg-white/5"
+                  }`}
                 >
-                  {flexRender(
-                    header.column.columnDef.header,
-                    header.getContext()
-                  )}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {table.getRowModel().rows.map((row, index) => (
-              <tr
-                key={row.id}
-                className={`group border-b border-white/5 transition-colors hover:bg-white/5 ${
-                  index === 0 ? "bg-[#1E40AF]/10" : ""
-                }`}
-              >
-                {row.getVisibleCells().map((cell) => (
-                  <td key={cell.id} className="px-4 py-3">
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </td>
+                  Reliability (Health)
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setSortBy("storage")}
+                  className={`cursor-pointer text-sm ${
+                    sortBy === "storage"
+                      ? "bg-[#1E40AF] text-white"
+                      : "text-[#E5E7EB] hover:bg-white/5"
+                  }`}
+                >
+                  Storage Committed
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setSortBy("uptime")}
+                  className={`cursor-pointer text-sm ${
+                    sortBy === "uptime"
+                      ? "bg-[#1E40AF] text-white"
+                      : "text-[#E5E7EB] hover:bg-white/5"
+                  }`}
+                >
+                  Uptime
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
+          {/* Table */}
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-white/5">
+                  {table.getFlatHeaders().map((header) => (
+                    <th
+                      key={header.id}
+                      className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-[#6B7280]"
+                    >
+                      {flexRender(
+                        header.column.columnDef.header,
+                        header.getContext()
+                      )}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {table.getRowModel().rows.map((row, index) => (
+                  <tr
+                    key={row.id}
+                    className={`group border-b border-white/5 transition-colors hover:bg-white/5 ${
+                      index === 0 ? "bg-[#1E40AF]/10" : ""
+                    }`}
+                  >
+                    {row.getVisibleCells().map((cell) => (
+                      <td key={cell.id} className="px-4 py-3">
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </td>
+                    ))}
+                  </tr>
                 ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
     </div>
   );
 }

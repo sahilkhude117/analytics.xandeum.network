@@ -1,5 +1,6 @@
 "use client";
 
+import React, { useMemo, useCallback } from "react";
 import {
   LineChart,
   Line,
@@ -9,6 +10,8 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import { BaseChartContainer } from "./base-chart-container";
+import { getDefaultTooltipStyle, getDefaultAxisStyle } from "../../lib/chart-utils";
 
 interface PodsGrowthChartProps {
   data?: { time: string; pods: number }[];
@@ -24,30 +27,29 @@ const defaultData = [
   { time: "Dec 21", pods: 140 },
 ];
 
-export function PodsGrowthChart({ data = defaultData }: PodsGrowthChartProps) {
-  return (
-    <div className="rounded-lg border border-white/5 bg-[#0b0b0b] p-6">
-      <div className="mb-6">
-        <h3 className="text-xs font-medium uppercase tracking-wide text-[#6B7280]">
-          Pods Growth Over Time
-        </h3>
-        <p className="mt-1 text-sm text-[#9CA3AF]">Total pods tracked over time</p>
-      </div>
+export const PodsGrowthChart = React.memo<PodsGrowthChartProps>(({ data = defaultData }) => {
+  const tooltip = useMemo(() => getDefaultTooltipStyle(), []);
+  const axis = useMemo(() => getDefaultAxisStyle(), []);
 
+  const tooltipFormatter = useCallback((value: number | undefined) => [`${value ?? "N/A"}`, "Pods"], []);
+
+  const legend = useMemo(() => [{ color: "#1E40AF", label: "Pods" }], []);
+
+  return (
+    <BaseChartContainer
+      title="Pods Growth Over Time"
+      description="Total pods tracked over time"
+      legend={legend}
+    >
       <ResponsiveContainer width="100%" height={300}>
         <LineChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" />
-          <XAxis dataKey="time" stroke="#6B7280" style={{ fontSize: "12px" }} />
-          <YAxis stroke="#6B7280" style={{ fontSize: "12px" }} />
+          <XAxis dataKey="time" stroke={axis.stroke} style={axis.style} />
+          <YAxis stroke={axis.stroke} style={axis.style} />
           <Tooltip
-            contentStyle={{
-              backgroundColor: "#0A0A0A",
-              border: "1px solid rgba(255,255,255,0.06)",
-              borderRadius: 8,
-              color: "#E5E7EB",
-            }}
-            labelStyle={{ color: "#9CA3AF", marginBottom: "4px" }}
-            formatter={(value: number | undefined) => [`${value ?? "N/A"}`, "Pods"]}
+            contentStyle={tooltip.contentStyle}
+            labelStyle={tooltip.labelStyle}
+            formatter={tooltipFormatter}
           />
           <Line
             type="monotone"
@@ -59,11 +61,6 @@ export function PodsGrowthChart({ data = defaultData }: PodsGrowthChartProps) {
           />
         </LineChart>
       </ResponsiveContainer>
-
-      <div className="mt-4 flex items-center justify-center gap-2 text-sm">
-        <div className="h-3 w-3 rounded-sm bg-[#1E40AF]" />
-        <span className="text-[#9CA3AF]">Pods</span>
-      </div>
-    </div>
+    </BaseChartContainer>
   );
-}
+});

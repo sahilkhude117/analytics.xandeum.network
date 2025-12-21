@@ -1,11 +1,15 @@
 
-import { KpiCard } from "@/components/ui/kpi-card";
+import { KpiCard } from "@/components/kpi-card";
 import { StorageUtilizationChart } from "@/components/charts/storage-utilization-chart";
 import { NodeStatusChart } from "@/components/charts/node-status-chart";
 import { TopPerformersTable } from "@/components/tables/top-performers-table";
 import { ArrowRight } from "lucide-react";
+import KpiCardSkeleton from "@/components/skeletons/kpi-card-skeleton";
+import ChartSkeleton from "@/components/skeletons/chart-skeleton";
 
 export default function Home() {
+  const isLoading = false;
+
   // Mock data
   const networkData = {
     totalPods: 226,
@@ -44,50 +48,56 @@ export default function Home() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        <KpiCard
-          title="Total Pods"
-          value={networkData.totalPods}
-          subtitle={`${networkData.onlinePods} online`}
-        />
-        <KpiCard
-          title="Storage Committed"
-          value={`${networkData.storageCommitted} TB`}
-          trend={{ value: "6.2% (7d)", isPositive: true }}
-        />
-        <KpiCard
-          title="Storage Used"
-          value={`${networkData.storageUsed} TB`}
-          subtitle={`${storageUsedPercentage}% utilized`}
-        />
-        <KpiCard
-          title="Avg Storage Per Pod"
-          value={`${networkData.avgCommittedPerPod} TB`}
-          subtitle="committed"
-        />
-        <KpiCard
-          title="Avg Uptime"
-          value={`${networkData.avgUptime}%`}
-          trend={{ value: "0.3% (7d)", isPositive: true }}
-        />
-        <KpiCard
-          title="Health Score"
-          value={`${networkData.healthScore}%`}
-        />
+        {isLoading ? (
+          Array.from({ length: 6 }).map((_, i) => <KpiCardSkeleton key={i} />)
+        ) : (
+          <>
+            <KpiCard
+              title="Total Pods"
+              value={networkData.totalPods}
+              subtitle={`${networkData.onlinePods} online`}
+            />
+            <KpiCard
+              title="Storage Committed"
+              value={`${networkData.storageCommitted} TB`}
+              trend={{ value: "6.2% (7d)", isPositive: true }}
+            />
+            <KpiCard
+              title="Storage Used"
+              value={`${networkData.storageUsed} TB`}
+              subtitle={`${storageUsedPercentage}% utilized`}
+            />
+            <KpiCard
+              title="Avg Storage Per Pod"
+              value={`${networkData.avgCommittedPerPod} TB`}
+              subtitle="committed"
+            />
+            <KpiCard
+              title="Avg Uptime"
+              value={`${networkData.avgUptime}%`}
+              trend={{ value: "0.3% (7d)", isPositive: true }}
+            />
+            <KpiCard
+              title="Health Score"
+              value={`${networkData.healthScore}%`}
+            />
+          </>
+        )}
       </div>
 
       {/* Charts Section */}
       <div className="mt-8 grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <StorageUtilizationChart />
+          {isLoading ? <ChartSkeleton /> : <StorageUtilizationChart />}
         </div>
         <div className="lg:col-span-1">
-          <NodeStatusChart />
+          {isLoading ? <ChartSkeleton /> : <NodeStatusChart />}
         </div>
       </div>
 
       {/* Top Performers Section */}
       <div className="mt-8">
-        <TopPerformersTable />
+        <TopPerformersTable isLoading={isLoading} />
       </div>
 
       {/* Navigation Links */}
