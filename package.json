@@ -48,6 +48,7 @@
     "shadcn": "^3.6.2",
     "tailwind-merge": "^3.4.0",
     "tsx": "^4.21.0",
+    "xlsx": "^0.18.5",
     "zod": "^4.2.1"
   },
   "devDependencies": {
