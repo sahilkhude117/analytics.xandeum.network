@@ -167,6 +167,23 @@ export default function NetworkPage() {
     return '#EF4444'; // Red
   };
 
+  const getHealthStatusText = (score: number) => {
+    if (score >= 90) return "Excellent";
+    if (score >= 70) return "Good";
+    if (score >= 50) return "Fair";
+    if (score >= 30) return "Poor";
+    if (score > 0) return "Critical";
+    return "Offline";
+  };
+
+  const getHealthStatusColor = (score: number) => {
+    if (score >= 70) return '#22c55e'; // Green
+    if (score >= 50) return '#FACC15'; // Yellow
+    if (score >= 30) return '#F97316'; // Orange
+    if (score > 0) return '#EF4444'; // Red
+    return '#6B7280'; // Gray
+  };
+
   // Prepare chart data from live network data
   const versionData = useMemo(() => {
     if (!networkData?.versionDistribution) return [];
@@ -219,76 +236,6 @@ export default function NetworkPage() {
   return (
     <main className="font-mono min-h-screen max-w-[min(100vw,1600px)] mx-auto relative overflow-hidden flex flex-col px-6">
       <div className="w-full max-w-[1600px] space-y-1.5 mx-auto mt-0 mb-0">
-        {/* Mobile Layout */}
-        <div className="flex flex-col min-[961px]:hidden">
-          <header className="flex flex-col items-start font-mono text-sm uppercase gap-2">
-            <h1 className="text-[#E5E7EB] font-mono my-0 text-2xl font-bold normal-case">
-              Network Overview
-            </h1>
-            <p className="text-[#9CA3AF] font-mono my-0">
-              Global pNodes Distribution
-            </p>
-          </header>
-
-          <section className="pb-6 w-full">
-            <div className="flex flex-col gap-y-6">
-              <TotalPods data={networkData} isLoading={isNetworkLoading} />
-              <NetworkStats data={networkData} isLoading={isNetworkLoading} />
-            </div>
-          </section>
-
-          <div className="w-full flex justify-center pointer-events-none">
-            <NetworkMapWrapper />
-          </div>
-
-          {/* KPI Cards Section - Mobile */}
-          <div className="mt-6 grid grid-cols-2 gap-4">
-            {isNetworkLoading ? (
-              Array.from({ length: 5 }).map((_, i) => <KpiCardSkeleton key={i} />)
-            ) : networkData ? (
-              <>
-                <KpiCard
-                  title="Storage Committed"
-                  value={formatStorageValue(networkData.totalStorageCommitted)}
-                  tooltip={getFullStorageValue(networkData.totalStorageCommitted)}
-                />
-                <KpiCard
-                  title="Storage Used"
-                  value={formatStorageValue(networkData.totalStorageUsed)}
-                  tooltip={getFullStorageValue(networkData.totalStorageUsed)}
-                  subtitle={`${networkData.avgStorageUsagePercent > 0 ? networkData.avgStorageUsagePercent.toFixed(2) : '< 0.01'}% utilized`}
-                />
-                <KpiCard
-                  title="Avg Storage Used"
-                  value={avgStorageUsed < 1 ? `${avgStorageUsed.toFixed(2)} MB` : `${(avgStorageUsed / 1024).toFixed(2)} GB`}
-                  tooltip={`${avgStorageUsed.toFixed(2)} MB per pod`}
-                  subtitle="per pod"
-                />
-                <KpiCard
-                  title="Avg Storage Per Pod"
-                  value={formatStorageValue(avgStoragePerPod)}
-                  tooltip={getFullStorageValue(avgStoragePerPod)}
-                  subtitle="committed"
-                />
-                <KpiCard
-                  title="Avg Uptime"
-                  value={formatUptime(networkData.avgUptime)}
-                  subtitle={`${networkData.avgUptime.toLocaleString()} seconds`}
-                />
-                <KpiCard
-                  title="Health Score"
-                  value={`${networkData.healthScore}%`}
-                  valueColor={getHealthColor(networkData.healthScore)}
-                />
-              </>
-            ) : (
-              Array.from({ length: 6 }).map((_, i) => (
-                <KpiCard key={i} title="---" value="---" />
-              ))
-            )}
-          </div>
-        </div>
-
         {/* Desktop Layout */}
         <div className="relative hidden min-[961px]:flex flex-row max-lg:items-end lg:items-center lg:justify-between">
           <header className="flex flex-col items-start font-mono text-sm xl:text-md uppercase gap-2 max-lg:mb-6 mb-auto mt-8">
@@ -316,9 +263,12 @@ export default function NetworkPage() {
         <div className="mt-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-lg border border-white/10 bg-[#0b0b0b] p-4">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
-              <div className="h-2 w-2 rounded-full bg-[#22c55e]" />
+              <div 
+                className="h-2 w-2 rounded-full" 
+                style={{ backgroundColor: networkData ? getHealthStatusColor(networkData.healthScore) : '#6B7280' }}
+              />
               <span className="text-sm font-semibold text-[#E5E7EB]">
-                Network Status: Healthy
+                Network Status: {networkData ? getHealthStatusText(networkData.healthScore) : 'Unknown'}
               </span>
             </div>
             <div className="h-4 w-px bg-white/10" />

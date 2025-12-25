@@ -122,6 +122,23 @@ export default function Home() {
     ].filter(item => item.value >= 0); // Only show categories with values
   }, [networkData]);
 
+  const getHealthStatusText = (score: number) => {
+    if (score >= 90) return "Excellent";
+    if (score >= 70) return "Good";
+    if (score >= 50) return "Fair";
+    if (score >= 30) return "Poor";
+    if (score > 0) return "Critical";
+    return "Offline";
+  };
+
+  const getHealthStatusColor = (score: number) => {
+    if (score >= 70) return '#22c55e'; // Green
+    if (score >= 50) return '#FACC15'; // Yellow
+    if (score >= 30) return '#F97316'; // Orange
+    if (score > 0) return '#EF4444'; // Red
+    return '#6B7280'; // Gray
+  };
+
   const lastUpdatedText = useMemo(() => {
     if (lastRefreshTime) {
       return formatDistanceToNow(lastRefreshTime, { addSuffix: true });
@@ -141,9 +158,12 @@ export default function Home() {
             Xandeum pNodes – Network Overview
           </h1>
           <div className="flex items-center gap-2 rounded-lg border border-white/5 bg-[#0b0b0b] px-4 py-2">
-            <div className="h-2 w-2 rounded-full bg-[#22c55e]" />
+            <div 
+              className="h-2 w-2 rounded-full" 
+              style={{ backgroundColor: networkData ? getHealthStatusColor(networkData.healthScore) : '#6B7280' }}
+            />
             <span className="text-sm font-semibold text-[#E5E7EB]">
-              Network Status: Healthy
+              Network Status: {networkData ? getHealthStatusText(networkData.healthScore) : 'Unknown'}
             </span>
           </div>
           <button
