@@ -189,6 +189,17 @@ export interface NetworkStats {
   totalBytes: string | null;
   totalPages: number | null;
   networkHealthScore: number;
+  // Optional distribution data (may not be present in all responses)
+  versionDistribution?: Array<{ version: string; count: number }>;
+  storageDistribution?: Array<{ range: string; count: number; min: number; max: number }>;
+  advancedMetrics?: {
+    avgCpu: number;
+    avgRam: number;
+    totalStreams: number;
+    totalPacketsSent: string;
+    totalPacketsReceived: string;
+    totalPages: number;
+  };
 }
 
 export interface NetworkLiveMetrics {
@@ -204,6 +215,16 @@ export interface NetworkLiveMetrics {
   avgStorageUsagePercent: number;
   avgUptime: number;
   networkHealthScore: number;
+  versionDistribution?: Array<{ version: string; count: number }>;
+  storageDistribution?: Array<{ range: string; count: number; min: number; max: number }>;
+  advancedMetrics?: {
+    avgCpu: number;
+    avgRam: number;
+    totalStreams: number;
+    totalPacketsSent: string;
+    totalPacketsReceived: string;
+    totalPages: number;
+  };
 }
 
 export interface NetworkDetailedMetrics {

@@ -8,7 +8,6 @@ import { VersionDistributionChart } from '@/components/charts/version-distributi
 import { StorageDistributionChart } from '@/components/charts/storage-distribution-chart';
 import { PodsGrowthChart } from '@/components/charts/pods-growth-chart';
 import { AdvancedMetricsSection } from '@/components/advanced-metrics-section';
-import { mockPods } from '@/lib/mockPods';
 import { useState, useEffect, useMemo } from 'react';
 import KpiCardSkeleton  from '@/components/skeletons/kpi-card-skeleton';
 import ChartSkeleton from '@/components/skeletons/chart-skeleton';
@@ -69,11 +68,18 @@ export default function NetworkPage() {
   const networkData = useMemo(() => {
     if (!data) return null;
 
+    console.log("[NETWORK PAGE] Processing data:", {
+      hasData: !!data,
+      isHybrid: "dataSource" in data,
+      keys: Object.keys(data),
+    });
+
     const isHybrid = "dataSource" in data;
     
     if (isHybrid) {
       const hybrid = data as NetworkHybridResponse;
       const live = hybrid.liveMetrics;
+      const detailed = hybrid.detailedMetrics;
       
       return {
         totalPods: live?.totalPNodes ?? 0,
@@ -88,9 +94,20 @@ export default function NetworkPage() {
         avgUptime: live?.avgUptime ?? 0,
         healthScore: live?.networkHealthScore ?? 0,
         timestamp: live?.timestamp ?? new Date().toISOString(),
+        versionDistribution: live?.versionDistribution ?? [],
+        storageDistribution: live?.storageDistribution ?? [],
+        advancedMetrics: live?.advancedMetrics ?? {
+          avgCpu: detailed?.avgCpuPercent ?? 0,
+          avgRam: detailed?.avgRamUsagePercent ?? 0,
+          totalStreams: detailed?.totalActiveStreams ?? 0,
+          totalPacketsSent: detailed?.totalPacketsSent ?? "0",
+          totalPacketsReceived: detailed?.totalPacketsReceived ?? "0",
+          totalPages: detailed?.totalPages ?? 0,
+        },
       };
     } else {
       const stats = data as NetworkStatsType;
+      
       return {
         totalPods: stats.totalPNodes,
         onlinePods: stats.onlinePNodes,
@@ -104,6 +121,16 @@ export default function NetworkPage() {
         avgUptime: stats.avgUptime,
         healthScore: stats.networkHealthScore,
         timestamp: stats.timestamp,
+        versionDistribution: stats.versionDistribution ?? [],
+        storageDistribution: stats.storageDistribution ?? [],
+        advancedMetrics: stats.advancedMetrics ?? {
+          avgCpu: stats.avgCpuPercent ?? 0,
+          avgRam: stats.avgRamUsagePercent ?? 0,
+          totalStreams: stats.totalActiveStreams ?? 0,
+          totalPacketsSent: stats.totalPacketsSent ?? "0",
+          totalPacketsReceived: stats.totalPacketsReceived ?? "0",
+          totalPages: stats.totalPages ?? 0,
+        },
       };
     }
   }, [data]);
@@ -113,6 +140,14 @@ export default function NetworkPage() {
     const committed = BigInt(networkData.totalStorageCommitted);
     const avgBytes = Number(committed) / networkData.totalPods;
     return avgBytes.toString();
+  }, [networkData]);
+
+  const avgStorageUsed = useMemo(() => {
+    if (!networkData || networkData.totalPods === 0) return 0;
+    const used = Number(BigInt(networkData.totalStorageUsed));
+    const avgBytes = used / networkData.totalPods;
+    const avgMB = avgBytes / (1024 * 1024);
+    return avgMB;
   }, [networkData]);
 
   const lastUpdatedText = useMemo(() => {
@@ -132,68 +167,54 @@ export default function NetworkPage() {
     return '#EF4444'; // Red
   };
 
-  // Mock data for charts only
-  const versionCounts = mockPods.reduce((acc, pod) => {
-    acc[pod.version] = (acc[pod.version] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
+  // Prepare chart data from live network data
+  const versionData = useMemo(() => {
+    if (!networkData?.versionDistribution) return [];
+    
+    const versionColors: Record<string, string> = {
+      '0.8.0': '#1E40AF',
+      '0.8.0-trynet.20251217111503.7a5b0240.7.3': '#008000',
+      '0.8.0-trynet.20251212183600.9eea72e': '#6366F1',
+      '0.7.1': '#9333EA',
+      '1.0.0': '#EF4444',
+    };
+    
+    return networkData.versionDistribution.map((item) => ({
+      name: item.version,
+      value: item.count,
+      color: versionColors[item.version] || '#6B7280',
+    }));
+  }, [networkData?.versionDistribution]);
 
-  const versionColors: Record<string, string> = {
-    '0.8.0': '#1E40AF',
-    '0.8.0-trynet.20251217111503.7a5b0240.7.3': '#008000',
-    '0.8.0-trynet.20251212183600.9eea72e': '',
-    '0.7.1': '#9333EA',
-    '1.0.0': '#EF4444',
-  };
+  const storageData = useMemo(() => {
+    if (!networkData?.storageDistribution) return [];
+    return networkData.storageDistribution.map((item) => ({
+      range: item.range,
+      count: item.count,
+    }));
+  }, [networkData?.storageDistribution]);
 
-  const versionData = Object.entries(versionCounts).map(([version, count]) => ({
-    name: version,
-    value: count,
-    color: versionColors[version] || '#6B7280',
-  }));
-
-  // Calculate storage distribution by size range
-  const storageRanges = [
-    { range: '0–1 GB', min: 0, max: 1, count: 12},
-    { range: '1–10 GB', min: 1, max: 10, count: 50 },
-    { range: '10–50 GB', min: 10, max: 50, count: 15 },
-    { range: '50–100 GB', min: 50, max: 100, count: 30 },
-    { range: '100–500 GB', min: 100, max: 500, count: 10 },
-    { range: '500+ GB', min: 500, max: Infinity },
-  ];
-
-  const storageData = storageRanges.map(({ range, min, max }) => ({
-    range,
-    count: mockPods.filter(pod => {
-      const storage = pod.storageCommitted;
-      return storage >= min && storage < max;
-    }).length,
-  }));
-
-  const totalInRanges = storageData.reduce((s, r) => s + r.count, 0);
-  if (totalInRanges < 20) {
-    const sample = [
-      { range: '0–1 GB', count: 42 },
-      { range: '1–10 GB', count: 128 },
-      { range: '10–50 GB', count: 76 },
-      { range: '50–100 GB', count: 31 },
-      { range: '100–500 GB', count: 14 },
-      { range: '500+ GB', count: 6 },
-    ];
-    for (let i = 0; i < storageData.length; i++) {
-      storageData[i].count = sample[i]?.count ?? 0;
+  const advancedMetrics = useMemo(() => {
+    if (!networkData?.advancedMetrics) {
+      return {
+        avgCpu: 0,
+        avgRam: 0,
+        totalStreams: 0,
+        totalPacketsSent: 0,
+        totalPacketsReceived: 0,
+        totalPages: 0,
+      };
     }
-  }
-
-  const publicPods = mockPods.filter(p => p.visibility === 'PUBLIC');
-  const advancedMetrics = {
-    avgCpu: publicPods.length > 0 ? Math.round(publicPods.reduce((sum, pod) => sum + (Math.random() * 60 + 30), 0) / publicPods.length) : 0,
-    avgRam: publicPods.length > 0 ? Math.round(publicPods.reduce((sum, pod) => sum + (Math.random() * 50 + 30), 0) / publicPods.length) : 0,
-    totalStreams: publicPods.length * 156,
-    totalPacketsSent: publicPods.length * 9842301,
-    totalPacketsReceived: publicPods.length * 8234512,
-    totalPages: publicPods.length * 234891,
-  };
+    
+    return {
+      avgCpu: Math.round(networkData.advancedMetrics.avgCpu),
+      avgRam: Math.round(networkData.advancedMetrics.avgRam),
+      totalStreams: networkData.advancedMetrics.totalStreams,
+      totalPacketsSent: parseInt(networkData.advancedMetrics.totalPacketsSent) || 0,
+      totalPacketsReceived: parseInt(networkData.advancedMetrics.totalPacketsReceived) || 0,
+      totalPages: networkData.advancedMetrics.totalPages,
+    };
+  }, [networkData?.advancedMetrics]);
 
   return (
     <main className="font-mono min-h-screen max-w-[min(100vw,1600px)] mx-auto relative overflow-hidden flex flex-col px-6">
@@ -223,7 +244,7 @@ export default function NetworkPage() {
           {/* KPI Cards Section - Mobile */}
           <div className="mt-6 grid grid-cols-2 gap-4">
             {isNetworkLoading ? (
-              Array.from({ length: 6 }).map((_, i) => <KpiCardSkeleton key={i} />)
+              Array.from({ length: 5 }).map((_, i) => <KpiCardSkeleton key={i} />)
             ) : networkData ? (
               <>
                 <KpiCard
@@ -236,6 +257,12 @@ export default function NetworkPage() {
                   value={formatStorageValue(networkData.totalStorageUsed)}
                   tooltip={getFullStorageValue(networkData.totalStorageUsed)}
                   subtitle={`${networkData.avgStorageUsagePercent > 0 ? networkData.avgStorageUsagePercent.toFixed(2) : '< 0.01'}% utilized`}
+                />
+                <KpiCard
+                  title="Avg Storage Used"
+                  value={avgStorageUsed < 1 ? `${avgStorageUsed.toFixed(2)} MB` : `${(avgStorageUsed / 1024).toFixed(2)} GB`}
+                  tooltip={`${avgStorageUsed.toFixed(2)} MB per pod`}
+                  subtitle="per pod"
                 />
                 <KpiCard
                   title="Avg Storage Per Pod"
@@ -252,11 +279,6 @@ export default function NetworkPage() {
                   title="Health Score"
                   value={`${networkData.healthScore}%`}
                   valueColor={getHealthColor(networkData.healthScore)}
-                />
-                <KpiCard
-                  title="Public / Private Pods"
-                  value={`${networkData.publicPods} / ${networkData.privatePods}`}
-                  subtitle="node visibility"
                 />
               </>
             ) : (
@@ -333,6 +355,12 @@ export default function NetworkPage() {
                 subtitle={`${networkData.avgStorageUsagePercent > 0 ? networkData.avgStorageUsagePercent.toFixed(2) : '< 0.01'}% utilized`}
               />
               <KpiCard
+                title="Avg Storage Used"
+                value={avgStorageUsed < 1 ? `${avgStorageUsed.toFixed(2)} MB` : `${(avgStorageUsed / 1024).toFixed(2)} GB`}
+                tooltip={`${avgStorageUsed.toFixed(2)} MB per pod`}
+                subtitle="per pod"
+              />
+              <KpiCard
                 title="Avg Storage Per Pod"
                 value={formatStorageValue(avgStoragePerPod)}
                 tooltip={getFullStorageValue(avgStoragePerPod)}
@@ -348,11 +376,6 @@ export default function NetworkPage() {
                 value={`${networkData.healthScore}%`}
                 valueColor={getHealthColor(networkData.healthScore)}
               />
-              <KpiCard
-                title="Public / Private Pods"
-                value={`${networkData.publicPods} / ${networkData.privatePods}`}
-                subtitle="node visibility"
-              />
             </>
           ) : (
             <>
@@ -365,6 +388,10 @@ export default function NetworkPage() {
                 value="---"
               />
               <KpiCard
+                title="Avg Storage Used"
+                value="---"
+              />
+              <KpiCard
                 title="Avg Storage Per Pod"
                 value="---"
               />
@@ -374,10 +401,6 @@ export default function NetworkPage() {
               />
               <KpiCard
                 title="Health Score"
-                value="---"
-              />
-              <KpiCard
-                title="Public / Private Pods"
                 value="---"
               />
             </>

@@ -68,8 +68,16 @@ export function AdvancedMetricsSection({
         <div className="mt-6 space-y-6 animate-in fade-in slide-in-from-top-4 duration-300">
           {/* KPI Row */}
           <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
-            <KpiCard title="Avg CPU %" value={`${avgCpu}%`} />
-            <KpiCard title="Avg RAM Usage %" value={`${avgRam}%`} />
+            <KpiCard 
+              title="Avg CPU %" 
+              value={`${Math.round(avgCpu)}%`} 
+              tooltip={`${avgCpu.toFixed(2)}% average CPU usage`}
+            />
+            <KpiCard 
+              title="Avg RAM Usage %" 
+              value={`${Math.round(avgRam)}%`} 
+              tooltip={`${avgRam.toFixed(2)}% average RAM usage`}
+            />
             <KpiCard title="Total Active Streams" value={totalStreams.toLocaleString()} />
             <KpiCard
               title="Total Packets Sent"
