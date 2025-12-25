@@ -15,6 +15,7 @@ interface BaseChartContainerProps {
   children: React.ReactNode;
   legend?: LegendItem[];
   className?: string;
+  rightElement?: React.ReactNode;
 }
 
 export function BaseChartContainer({
@@ -23,14 +24,18 @@ export function BaseChartContainer({
   children,
   legend,
   className = "",
+  rightElement,
 }: BaseChartContainerProps) {
   return (
     <div className={`rounded-lg border border-white/5 bg-[#0b0b0b] p-6 ${className}`}>
-      <ChartHeader title={title} description={description} />
-        <div style={{ minWidth: 0, minHeight: 0 }} className="mt-4 w-full">
-          {children}
-        </div>
-        {legend && <ChartLegend items={legend} />}
+      <div className="flex items-start justify-between gap-4">
+        <ChartHeader title={title} description={description} />
+        {rightElement && <div className="flex-shrink-0">{rightElement}</div>}
+      </div>
+      <div style={{ minWidth: 0, minHeight: 0 }} className="mt-4 w-full">
+        {children}
+      </div>
+      {legend && <ChartLegend items={legend} />}
     </div>
   );
 }

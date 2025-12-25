@@ -31,6 +31,7 @@ export default function Home() {
     try {
       const freshData = await apiClient.getNetworkStats(true);
       queryClient.setQueryData(["network"], freshData);
+      await queryClient.invalidateQueries({ queryKey: ["network-history"] });
     } finally {
       setIsRefreshing(false);
     }
@@ -47,6 +48,8 @@ export default function Home() {
             try {
               const freshData = await apiClient.getNetworkStats(true);
               queryClient.setQueryData(["network"], freshData);
+              // Also invalidate network-history to refresh the chart
+              await queryClient.invalidateQueries({ queryKey: ["network-history"] });
             } finally {
               setIsRefreshing(false);
             }

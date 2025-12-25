@@ -93,3 +93,37 @@ export const getHealthColor = (score: number): string => {
   if (score >= 50) return "#FACC15";
   return "#EF4444";
 };
+
+export const formatChartDate = (timestamp: string, timeRange: string): string => {
+  const date = new Date(timestamp);
+  
+  if (timeRange === "1h" || timeRange === "6h") {
+    return date.toLocaleTimeString("en-US", { 
+      hour: "2-digit", 
+      minute: "2-digit",
+      hour12: false 
+    });
+  }
+  
+  if (timeRange === "24h") {
+    return date.toLocaleTimeString("en-US", { 
+      hour: "numeric", 
+      minute: "2-digit" 
+    });
+  }
+  
+  if (timeRange === "7d") {
+    const day = date.toLocaleDateString("en-US", { weekday: "short" });
+    const time = date.toLocaleTimeString("en-US", { 
+      hour: "2-digit", 
+      minute: "2-digit",
+      hour12: false 
+    });
+    return `${day} ${time}`;
+  }
+
+  return date.toLocaleDateString("en-US", { 
+    month: "short", 
+    day: "numeric" 
+  });
+};

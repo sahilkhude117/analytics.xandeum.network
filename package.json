@@ -44,6 +44,7 @@
     "react-simple-maps": "^3.0.0",
     "recharts": "^3.6.0",
     "redis": "^5.10.0",
+    "redis-cli": "^2.1.2",
     "shadcn": "^3.6.2",
     "tailwind-merge": "^3.4.0",
     "tsx": "^4.21.0",

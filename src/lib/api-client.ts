@@ -1,6 +1,8 @@
-import type { NetworkStats, NetworkHybridResponse } from "./types";
+import type { NetworkStats, NetworkHybridResponse, NetworkHistory } from "./types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "";
+
+export type TimeRange = "1h" | "6h" | "24h" | "7d" | "30d";
 
 export class ApiClient {
   private baseUrl: string;
@@ -32,6 +34,19 @@ export class ApiClient {
     const queryParam = refresh ? "?refresh=true" : "";
     return this.request<NetworkStats | NetworkHybridResponse>(
       `/api/v1/network${queryParam}`
+    );
+  }
+
+  async getNetworkHistory(
+    timeRange: TimeRange = "24h",
+    includeLive = false
+  ): Promise<NetworkHistory> {
+    const params = new URLSearchParams({
+      timeRange,
+      includeLive: includeLive.toString(),
+    });
+    return this.request<NetworkHistory>(
+      `/api/v1/network/history?${params.toString()}`
     );
   }
 }
