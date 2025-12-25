@@ -17,6 +17,7 @@ export function mapPNodeToListItem(pnode: PNode): PNodeListItem {
     uptime: pnode.uptime,
     lastSeenAt: pnode.lastSeenAt.toISOString(),
     healthScore: pnode.healthScore,
+    isPublic: pnode.isPublic,
   };
 }
 

@@ -1,5 +1,5 @@
 
-import { GeoLocation } from "./types.ts";
+import { GeoLocation } from "./types";
 
 interface IPAPIResponse {
   ip: string;
