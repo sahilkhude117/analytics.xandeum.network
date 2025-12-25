@@ -1,4 +1,5 @@
-import type { PNode, PNodeStats } from "../../../prisma/generated/client/client";
+
+import { PNode, PNodeStats } from "@prisma/client";
 import type { PNodeListItem, PNodeDetail } from "../types";
 
 export function mapPNodeToListItem(pnode: PNode): PNodeListItem {

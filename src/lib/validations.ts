@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { Status } from "../../prisma/generated/client/client";
+import { Status } from "@prisma/client";
 
 // API Query Schemas
 export const NetworkQuerySchema = z.object({
