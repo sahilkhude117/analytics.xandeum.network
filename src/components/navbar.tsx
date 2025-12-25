@@ -77,11 +77,8 @@ export function Navbar() {
           </div>
 
           {/* GitHub Link */}
-          <Button
-            asChild
-            variant="ghost"
-            size="icon"
-            className="h-24 w-12 text-[#9CA3AF] hover:bg-white/5 hover:text-[#E5E7EB]"
+          <button
+            className="h-24 w-12 flex items-center justify-center"
           >
             <a
               href="https://github.com/sahilkhude117/analytics.xandeum.network.git"
@@ -89,9 +86,9 @@ export function Navbar() {
               rel="noopener noreferrer"
               aria-label="GitHub Repository"
             >
-              <LucideGithub size={36} href="https://github.com/sahilkhude117/analytics.xandeum.network.git"/>
+              <LucideGithub size={24} href="https://github.com/sahilkhude117/analytics.xandeum.network.git"/>
             </a>
-          </Button>
+          </button>
 
           {/* Network Selector */}
           <DropdownMenu>

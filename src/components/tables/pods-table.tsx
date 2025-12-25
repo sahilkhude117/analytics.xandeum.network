@@ -10,7 +10,6 @@ import {
 } from "@tanstack/react-table";
 import { ChevronUp, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import TableSkeleton from "@/components/skeletons/table-skeleton";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 import { useDebounce } from "@/hooks/use-debounce";
 import { createPodColumns } from "./pods-table-columns";

@@ -32,13 +32,22 @@ export const formatStorage = (bytes: bigint | string | number): { display: strin
   
   const TB = 1024 ** 4;
   const GB = 1024 ** 3;
+  const MB = 1024 ** 2;
   
-  // Convert to TB
   const tbValue = bytesNum / TB;
-  
-  // If less than 0.1 TB, show in GB
-  if (tbValue < 0.1) {
+
+  if (tbValue < 1) {
     const gbValue = bytesNum / GB;
+
+    if (gbValue < 1) {
+      const mbValue = bytesNum / MB;
+      return {
+        display: mbValue.toFixed(2),
+        full: mbValue.toFixed(10).replace(/\.?0+$/, ''),
+        unit: 'MB'
+      };
+    }
+    
     return {
       display: gbValue.toFixed(2),
       full: gbValue.toFixed(10).replace(/\.?0+$/, ''),

@@ -17,9 +17,10 @@ interface KpiCardProps {
   };
   className?: string;
   tooltip?: string; // Full precision value for hover
+  valueColor?: string; // Custom color for the value
 }
 
-export function KpiCard({ title, value, subtitle, trend, className, tooltip }: KpiCardProps) {
+export function KpiCard({ title, value, subtitle, trend, className, tooltip, valueColor }: KpiCardProps) {
   return (
     <div
       className={cn(
@@ -31,7 +32,10 @@ export function KpiCard({ title, value, subtitle, trend, className, tooltip }: K
         {title}
       </div>
       <div className="flex items-center gap-2">
-        <div className="text-3xl font-bold text-[#E5E7EB]">
+        <div 
+          className="text-3xl font-bold text-[#E5E7EB]"
+          style={valueColor ? { color: valueColor } : undefined}
+        >
           {value}
         </div>
         {tooltip && (

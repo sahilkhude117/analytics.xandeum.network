@@ -229,11 +229,21 @@ export const createPodColumns = (
         const committed = info.row.original.storageCommitted;
         const used = info.row.original.storageUsed;
         const percent = (used / committed) * 100;
+        
+        // Format storage: show MB if used < 0.01 GB (would display as 0.00 GB)
+        const formatStorageDisplay = (gb: number): string => {
+          if (gb < 0.01) {
+            const mb = gb * 1024;
+            return `${mb.toFixed(2)} MB`;
+          }
+          return `${gb.toFixed(0)} GB`;
+        };
+        
         return (
           <div className="min-w-[160px]">
             <div className="flex items-center justify-between text-sm">
               <span className="text-[#E5E7EB]">
-                {used.toFixed(0)} GB / {committed.toFixed(0)} GB
+                {formatStorageDisplay(used)} / {committed.toFixed(0)} GB
               </span>
               <span className="text-[#9CA3AF]">{percent.toFixed(0)}%</span>
             </div>

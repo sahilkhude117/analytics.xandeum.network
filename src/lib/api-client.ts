@@ -1,4 +1,4 @@
-import type { NetworkStats, NetworkHybridResponse, NetworkHistory, PaginatedResponse, PNodeListItem } from "./types";
+import type { NetworkStats, NetworkHybridResponse, NetworkHistory, PaginatedResponse, PNodeListItem, PNodeDetail, PNodeHistory } from "./types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -81,6 +81,27 @@ export class ApiClient {
     const endpoint = `/api/v1/pnodes${queryString ? `?${queryString}` : ""}`;
     
     return this.request<PaginatedResponse<PNodeListItem>>(endpoint);
+  }
+
+  async getPnodeDetails(idOrPubkey: string, refresh = false): Promise<PNodeDetail> {
+    const queryParam = refresh ? "?refresh=true" : "";
+    return this.request<PNodeDetail>(
+      `/api/v1/pnodes/${encodeURIComponent(idOrPubkey)}${queryParam}`
+    );
+  }
+
+  async getPnodeHistory(
+    idOrPubkey: string,
+    timeRange: TimeRange = "24h",
+    includeLive = false
+  ): Promise<PNodeHistory> {
+    const params = new URLSearchParams({
+      timeRange,
+      includeLive: includeLive.toString(),
+    });
+    return this.request<PNodeHistory>(
+      `/api/v1/pnodes/${encodeURIComponent(idOrPubkey)}/history?${params.toString()}`
+    );
   }
 }
 

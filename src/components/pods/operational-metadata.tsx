@@ -14,14 +14,6 @@ export function OperationalMetadata({ pod }: OperationalMetadataProps) {
         <dl className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
             <dt className="text-xs font-medium uppercase tracking-wide text-[#6B7280]">
-              First Seen
-            </dt>
-            <dd className="mt-1 text-md text-[#E5E7EB]">
-              {pod.firstSeen.toLocaleString()}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs font-medium uppercase tracking-wide text-[#6B7280]">
               Last Seen
             </dt>
             <dd className="mt-1 text-md text-[#E5E7EB]">
@@ -38,12 +30,6 @@ export function OperationalMetadata({ pod }: OperationalMetadataProps) {
               </dd>
             </div>
           )}
-          <div>
-            <dt className="text-xs font-medium uppercase tracking-wide text-[#6B7280]">
-              Version
-            </dt>
-            <dd className="mt-1 text-md text-[#E5E7EB]">{pod.version}</dd>
-          </div>
         </dl>
       </div>
     </div>
