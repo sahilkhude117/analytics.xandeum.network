@@ -1,8 +1,5 @@
 {
-  "buildCommand": "prisma generate && next build",
   "framework": "nextjs",
   "installCommand": "bun install",
-  "env": {
-    "NODE_ENV": "production"
-  }
+  "buildCommand": "bun run build"
 }

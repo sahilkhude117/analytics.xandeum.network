@@ -4,14 +4,13 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
-    "db:reset": "prisma migrate reset",
-    "postinstall": "prisma generate"
+    "db:reset": "prisma migrate reset"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.2.0",
