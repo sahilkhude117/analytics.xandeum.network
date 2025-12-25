@@ -4,7 +4,7 @@ import { withCache } from "@/lib/cache";
 import { successResponse, handleError, buildCacheKey } from "@/lib/api";
 import { PNodeListQuerySchema } from "@/lib/validations";
 import type { PNodeListItem, PaginatedResponse } from "@/lib/types";
-import { Prisma } from "@prisma/client";
+import { Prisma, Status } from "@prisma/client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -45,10 +45,14 @@ export async function GET(request: NextRequest) {
       30, // 30 seconds TTL
       async () => {
 
-        const where: Prisma.PNodeWhereInput = {};
+        const where: Prisma.PNodeWhereInput = {
+          pubkey: { not: null },
+        };
 
         if (query.status) {
           where.status = query.status;
+        } else {
+          where.status = { not: Status.INVALID };
         }
 
         if (query.version) {

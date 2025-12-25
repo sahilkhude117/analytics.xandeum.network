@@ -4,15 +4,16 @@ import { useState, useMemo, memo } from 'react';
 import { ComposableMap, Geographies, Geography, Marker } from 'react-simple-maps';
 import { motion, AnimatePresence } from 'framer-motion';
 import { geoMercator } from 'd3-geo';
-import { mockPods } from '@/lib/mockPods';
+import { useMapPods, type MapPod } from '@/hooks/use-map-pods';
+import { Loader2 } from 'lucide-react';
 import { STATUS_COLORS } from '@/lib/constants/colors';
 
-// Map-friendly status color mapping (mockPods use lowercase status)
-const statusColors = {
-  online: STATUS_COLORS.ONLINE.dot,
-  degraded: STATUS_COLORS.DEGRADED.dot,
-  offline: STATUS_COLORS.OFFLINE.dot,
-  invalid: STATUS_COLORS.INVALID.dot,
+// Map-friendly status color mapping
+const statusColors: Record<string, string> = {
+  ONLINE: STATUS_COLORS.ONLINE.dot,
+  DEGRADED: STATUS_COLORS.DEGRADED.dot,
+  OFFLINE: STATUS_COLORS.OFFLINE.dot,
+  INVALID: STATUS_COLORS.INVALID.dot,
 };
 
 // Dotted map data - multiple cities per country for better coverage
@@ -52,16 +53,16 @@ const dottedMapData: Record<string, Array<{ lon: number; lat: number; cityDistan
 
 
 interface PodMarkerProps {
-  pod: typeof mockPods[0];
+  pod: MapPod;
   delay: number;
-  onHover: (pod: typeof mockPods[0] | null) => void;
+  onHover: (pod: MapPod | null) => void;
 }
 
 const PodMarker = memo(({ pod, delay, onHover }: PodMarkerProps) => {
-  const color = statusColors[pod.status as keyof typeof statusColors];
+  const color = statusColors[pod.status] || statusColors.INVALID;
 
   return (
-    <Marker coordinates={[pod.lng, pod.lat]}>
+    <Marker coordinates={[pod.longitude!, pod.latitude!]}>
       <motion.g
         initial={{ scale: 0, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
@@ -85,7 +86,7 @@ const PodMarker = memo(({ pod, delay, onHover }: PodMarkerProps) => {
           style={{ overflow: 'visible' }}
         >
           <defs>
-            <filter id={`shadow-${pod.id}`} x="-50%" y="-50%" width="200%" height="200%">
+            <filter id={`shadow-${pod.pubkey}`} x="-50%" y="-50%" width="200%" height="200%">
               <feGaussianBlur in="SourceAlpha" stdDeviation="2" />
               <feOffset dx="0" dy="2" result="offsetblur" />
               <feComponentTransfer>
@@ -100,7 +101,7 @@ const PodMarker = memo(({ pod, delay, onHover }: PodMarkerProps) => {
           <path
             d="M16 0C7.163 0 0 7.163 0 16c0 12 16 26 16 26s16-14 16-26c0-8.837-7.163-16-16-16z"
             fill={color}
-            filter={`url(#shadow-${pod.id})`}
+            filter={`url(#shadow-${pod.pubkey})`}
           />
           <circle cx="16" cy="16" r="6" fill="white" />
           <path
@@ -125,7 +126,8 @@ interface NetworkMapProps {
 }
 
 export default function NetworkMap({ className = '', width = 1000, height = 560 }: NetworkMapProps) {
-  const [hoveredPod, setHoveredPod] = useState<typeof mockPods[0] | null>(null);
+  const { data, isLoading, error } = useMapPods();
+  const [hoveredPod, setHoveredPod] = useState<MapPod | null>(null);
 
   const projection = useMemo(
     () =>
@@ -139,9 +141,33 @@ export default function NetworkMap({ className = '', width = 1000, height = 560 
 
   // Create delays for staggered animation
   const markerDelays = useMemo(
-    () => mockPods.map((_, i) => (i * 0.05) % 1),
-    []
+    () => (data?.pods || []).map((_, i) => (i * 0.05) % 1),
+    [data?.pods]
   );
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className={`relative w-full ${className}`}>
+        <div className="w-full h-[560px] bg-black rounded-md flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-[#9CA3AF]" />
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error || !data) {
+    return (
+      <div className={`relative w-full ${className}`}>
+        <div className="w-full h-[560px] bg-black rounded-md flex items-center justify-center">
+          <p className="text-red-400">Failed to load map data</p>
+        </div>
+      </div>
+    );
+  }
+
+  const pods = data.pods;
 
   return (
     <div className={`relative w-full ${className}`}>
@@ -170,9 +196,9 @@ export default function NetworkMap({ className = '', width = 1000, height = 560 
               ))
             }
           </Geographies>
-          {mockPods.map((pod, index) => (
+          {pods.map((pod, index) => (
             <PodMarker
-              key={pod.id}
+              key={pod.pubkey}
               pod={pod}
               delay={markerDelays[index]}
               onHover={setHoveredPod}
@@ -183,7 +209,7 @@ export default function NetworkMap({ className = '', width = 1000, height = 560 
 
       <AnimatePresence>
         {hoveredPod && (() => {
-          const coords = projection([hoveredPod.lng, hoveredPod.lat]);
+          const coords = projection([hoveredPod.longitude!, hoveredPod.latitude!]);
           if (!coords) return null;
 
           return (
@@ -215,9 +241,26 @@ export default function NetworkMap({ className = '', width = 1000, height = 560 
                   <span className="text-[#E5E7EB] font-medium font-mono text-base">{hoveredPod.pubkey.slice(0, 12)}...</span>
                 </div>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
-                  <span className="text-[#9CA3AF]">Storage:</span>
+                  {hoveredPod.city && hoveredPod.country && (
+                    <>
+                      <span className="text-[#9CA3AF]">Location:</span>
+                      <span className="text-[#E5E7EB] font-mono">{hoveredPod.city}, {hoveredPod.country}</span>
+                    </>
+                  )}
+                  <span className="text-[#9CA3AF]">Committed:</span>
                   <span className="text-[#E5E7EB] font-mono">
-                    {hoveredPod.storageUsed}/{hoveredPod.storageCommitted}GB
+                    {(Number(hoveredPod.storageCommitted) / (1024 ** 3)).toFixed(2)} GB
+                  </span>
+                  <span className="text-[#9CA3AF]">Used:</span>
+                  <span className="text-[#E5E7EB] font-mono">
+                    {(() => {
+                      const usedBytes = Number(hoveredPod.storageUsed);
+                      const usedMB = usedBytes / (1024 ** 2);
+                      const usedGB = usedBytes / (1024 ** 3);
+                      return usedMB < 1000 
+                        ? `${usedMB.toFixed(2)} MB` 
+                        : `${usedGB.toFixed(2)} GB`;
+                    })()}
                   </span>
                   <span className="text-[#9CA3AF]">Health:</span>
                   <span className="text-[#E5E7EB] font-mono">{hoveredPod.healthScore}%</span>
@@ -240,5 +283,3 @@ export default function NetworkMap({ className = '', width = 1000, height = 560 
     </div>
   );
 }
-
-// mockPods is provided by src/lib/mockPods

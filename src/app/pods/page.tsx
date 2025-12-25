@@ -122,11 +122,11 @@ export default function PodsPage() {
   return (
     <main className="container mx-auto px-6 py-8">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-[#E5E7EB]">All pNodes</h1>
+        <h1 className="text-2xl font-bold text-[#E5E7EB]">All Pods</h1>
         <p className="mt-1 text-sm text-[#9CA3AF]">
           {isLoading && page === 1
-            ? "Loading pNodes..."
-            : `${pods.length}${hasMore ? '+' : ''} of ${data?.pagination.total || 0} pNodes`}
+            ? "Loading pNodes...": ""
+          }
         </p>
       </div>
 

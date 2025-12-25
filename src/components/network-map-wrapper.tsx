@@ -1,6 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import { useMapPods } from '@/hooks/use-map-pods';
 
 const NetworkMap = dynamic(() => import('@/components/network-map'), {
   ssr: false,
@@ -9,6 +10,17 @@ const NetworkMap = dynamic(() => import('@/components/network-map'), {
   ),
 });
 
-export default function NetworkMapWrapper() {
+interface NetworkMapWrapperProps {
+  onDataLoad?: (data: ReturnType<typeof useMapPods>['data']) => void;
+}
+
+export default function NetworkMapWrapper({ onDataLoad }: NetworkMapWrapperProps) {
+  const mapQuery = useMapPods();
+  
+  // Notify parent when data changes
+  if (onDataLoad && mapQuery.data) {
+    onDataLoad(mapQuery.data);
+  }
+  
   return <NetworkMap />;
 }

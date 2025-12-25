@@ -28,7 +28,7 @@ export const SearchSchema = z.object({
 
 export const PNodeListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
-  pageSize: z.coerce.number().int().min(1).max(1000).default(20),
+  pageSize: z.coerce.number().int().min(1).default(20),
   status: z.nativeEnum(Status).optional(),
   version: z.string().optional(),
   country: z.string().optional(),

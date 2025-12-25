@@ -9,37 +9,130 @@ import { StorageDistributionChart } from '@/components/charts/storage-distributi
 import { PodsGrowthChart } from '@/components/charts/pods-growth-chart';
 import { AdvancedMetricsSection } from '@/components/advanced-metrics-section';
 import { mockPods } from '@/lib/mockPods';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import KpiCardSkeleton  from '@/components/skeletons/kpi-card-skeleton';
 import ChartSkeleton from '@/components/skeletons/chart-skeleton';
+import { useNetworkData } from '@/hooks/use-network-data';
+import { apiClient } from '@/lib/api-client';
+import { useQueryClient } from '@tanstack/react-query';
+import { formatDistanceToNow } from 'date-fns';
+import { formatUptime, formatStorageValue, getFullStorageValue } from '@/lib/formatters';
+import { RefreshCw } from 'lucide-react';
+import type { NetworkStats as NetworkStatsType, NetworkHybridResponse } from '@/lib/types';
 
 export default function NetworkPage() {
-  const [isLoading, setIsLoading] = useState(true);
+  const [lastRefreshTime, setLastRefreshTime] = useState<Date | null>(null);
+  const [countdown, setCountdown] = useState(30);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const queryClient = useQueryClient();
+  
+  const { data, isLoading: isNetworkLoading, isFetching } = useNetworkData();
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    setLastRefreshTime(new Date());
+    setCountdown(30);
+    try {
+      const freshData = await apiClient.getNetworkStats(true);
+      queryClient.setQueryData(["network"], freshData);
+      await queryClient.invalidateQueries({ queryKey: ["network-history"] });
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   useEffect(() => {
-    // Simulate loading time
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 2000);
+    const timer = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          (async () => {
+            setIsRefreshing(true);
+            setLastRefreshTime(new Date());
+            try {
+              const freshData = await apiClient.getNetworkStats(true);
+              queryClient.setQueryData(["network"], freshData);
+              await queryClient.invalidateQueries({ queryKey: ["network-history"] });
+            } finally {
+              setIsRefreshing(false);
+            }
+          })();
+          return 30;
+        }
+        return prev - 1;
+      });
+    }, 1000);
 
-    return () => clearTimeout(timer);
-  }, []);
+    return () => clearInterval(timer);
+  }, [queryClient]);
 
-  // Calculate KPI metrics
-  const avgStorageCommitted = (mockPods.reduce((sum, pod) => sum + pod.storageCommitted, 0) / mockPods.length).toFixed(1);
-  const avgStorageUsed = (mockPods.reduce((sum, pod) => sum + pod.storageUsed, 0) / mockPods.length).toFixed(1);
-  const totalCommitted = mockPods.reduce((sum, pod) => sum + pod.storageCommitted, 0);
-  const totalUsed = mockPods.reduce((sum, pod) => sum + pod.storageUsed, 0);
-  const avgUsagePercent = ((totalUsed / totalCommitted) * 100).toFixed(1);
-  const avgUptime = (mockPods.reduce((sum, pod) => sum + pod.uptime, 0) / mockPods.length / 86400).toFixed(1); // Convert to days
-  const avgHealth = Math.round(mockPods.reduce((sum, pod) => sum + pod.healthScore, 0) / mockPods.length);
-  const lastUpdated = new Date(Math.max(...mockPods.map(pod => pod.lastSeen.getTime())));
-  const timeDiff = Math.floor((Date.now() - lastUpdated.getTime()) / 60000); // minutes ago
-  const lastUpdatedText = timeDiff < 1 ? 'Just now' : timeDiff < 60 ? `${timeDiff}m ago` : `${Math.floor(timeDiff / 60)}h ago`;
-  const publicCount = mockPods.filter(p => p.visibility === 'PUBLIC').length;
-  const privateCount = mockPods.filter(p => p.visibility === 'PRIVATE').length;
 
-  // Calculate version distribution
+  const networkData = useMemo(() => {
+    if (!data) return null;
+
+    const isHybrid = "dataSource" in data;
+    
+    if (isHybrid) {
+      const hybrid = data as NetworkHybridResponse;
+      const live = hybrid.liveMetrics;
+      
+      return {
+        totalPods: live?.totalPNodes ?? 0,
+        onlinePods: live?.onlinePNodes ?? 0,
+        degradedPods: live?.degradedPNodes ?? 0,
+        offlinePods: live?.offlinePNodes ?? 0,
+        publicPods: live?.publicPNodes ?? 0,
+        privatePods: live?.privatePNodes ?? 0,
+        totalStorageCommitted: live?.totalStorageCommitted ?? "0",
+        totalStorageUsed: live?.totalStorageUsed ?? "0",
+        avgStorageUsagePercent: live?.avgStorageUsagePercent ?? 0,
+        avgUptime: live?.avgUptime ?? 0,
+        healthScore: live?.networkHealthScore ?? 0,
+        timestamp: live?.timestamp ?? new Date().toISOString(),
+      };
+    } else {
+      const stats = data as NetworkStatsType;
+      return {
+        totalPods: stats.totalPNodes,
+        onlinePods: stats.onlinePNodes,
+        degradedPods: stats.degradedPNodes,
+        offlinePods: stats.offlinePNodes,
+        publicPods: stats.publicPNodes ?? 0,
+        privatePods: stats.privatePNodes ?? 0,
+        totalStorageCommitted: stats.totalStorageCommitted,
+        totalStorageUsed: stats.totalStorageUsed,
+        avgStorageUsagePercent: stats.avgStorageUsagePercent,
+        avgUptime: stats.avgUptime,
+        healthScore: stats.networkHealthScore,
+        timestamp: stats.timestamp,
+      };
+    }
+  }, [data]);
+
+  const avgStoragePerPod = useMemo(() => {
+    if (!networkData || networkData.totalPods === 0) return "0";
+    const committed = BigInt(networkData.totalStorageCommitted);
+    const avgBytes = Number(committed) / networkData.totalPods;
+    return avgBytes.toString();
+  }, [networkData]);
+
+  const lastUpdatedText = useMemo(() => {
+    if (lastRefreshTime) {
+      return formatDistanceToNow(lastRefreshTime, { addSuffix: true });
+    }
+    if (networkData?.timestamp) {
+      return formatDistanceToNow(new Date(networkData.timestamp), { addSuffix: true });
+    }
+    return "moments ago";
+  }, [lastRefreshTime, networkData?.timestamp]);
+
+  const getHealthColor = (score: number) => {
+    if (score >= 80) return '#22C55E'; // Green
+    if (score >= 60) return '#FACC15'; // Yellow
+    if (score >= 40) return '#F97316'; // Orange
+    return '#EF4444'; // Red
+  };
+
+  // Mock data for charts only
   const versionCounts = mockPods.reduce((acc, pod) => {
     acc[pod.version] = (acc[pod.version] || 0) + 1;
     return acc;
@@ -77,8 +170,6 @@ export default function NetworkPage() {
     }).length,
   }));
 
-  // If dataset is very small (e.g. demo/mock with only a few pods),
-  // provide a fallback sample distribution so the chart shows varied bins
   const totalInRanges = storageData.reduce((s, r) => s + r.count, 0);
   if (totalInRanges < 20) {
     const sample = [
@@ -89,13 +180,11 @@ export default function NetworkPage() {
       { range: '100–500 GB', count: 14 },
       { range: '500+ GB', count: 6 },
     ];
-    // Use sample for visualization only
     for (let i = 0; i < storageData.length; i++) {
       storageData[i].count = sample[i]?.count ?? 0;
     }
   }
 
-  // Calculate advanced metrics (public pods only)
   const publicPods = mockPods.filter(p => p.visibility === 'PUBLIC');
   const advancedMetrics = {
     avgCpu: publicPods.length > 0 ? Math.round(publicPods.reduce((sum, pod) => sum + (Math.random() * 60 + 30), 0) / publicPods.length) : 0,
@@ -122,8 +211,8 @@ export default function NetworkPage() {
 
           <section className="pb-6 w-full">
             <div className="flex flex-col gap-y-6">
-              <TotalPods />
-              <NetworkStats />
+              <TotalPods data={networkData} isLoading={isNetworkLoading} />
+              <NetworkStats data={networkData} isLoading={isNetworkLoading} />
             </div>
           </section>
 
@@ -133,36 +222,47 @@ export default function NetworkPage() {
 
           {/* KPI Cards Section - Mobile */}
           <div className="mt-6 grid grid-cols-2 gap-4">
-            {isLoading ? (
+            {isNetworkLoading ? (
               Array.from({ length: 6 }).map((_, i) => <KpiCardSkeleton key={i} />)
-            ) : (
+            ) : networkData ? (
               <>
                 <KpiCard
                   title="Storage Committed"
-                  value={`${avgStorageCommitted} GB`}
+                  value={formatStorageValue(networkData.totalStorageCommitted)}
+                  tooltip={getFullStorageValue(networkData.totalStorageCommitted)}
                 />
                 <KpiCard
                   title="Storage Used"
-                  value={`${avgStorageUsed} GB`}
+                  value={formatStorageValue(networkData.totalStorageUsed)}
+                  tooltip={getFullStorageValue(networkData.totalStorageUsed)}
+                  subtitle={`${networkData.avgStorageUsagePercent > 0 ? networkData.avgStorageUsagePercent.toFixed(2) : '< 0.01'}% utilized`}
                 />
                 <KpiCard
-                  title="Avg Usage"
-                  value={`${avgUsagePercent}%`}
-                  subtitle="utilization"
+                  title="Avg Storage Per Pod"
+                  value={formatStorageValue(avgStoragePerPod)}
+                  tooltip={getFullStorageValue(avgStoragePerPod)}
+                  subtitle="committed"
                 />
                 <KpiCard
                   title="Avg Uptime"
-                  value={`${avgUptime} days`}
+                  value={formatUptime(networkData.avgUptime)}
+                  subtitle={`${networkData.avgUptime.toLocaleString()} seconds`}
                 />
                 <KpiCard
-                  title="Network Health"
-                  value={`${avgHealth}%`}
+                  title="Health Score"
+                  value={`${networkData.healthScore}%`}
+                  valueColor={getHealthColor(networkData.healthScore)}
                 />
                 <KpiCard
                   title="Public / Private Pods"
-                  value={`${publicCount} / ${privateCount}`}
+                  value={`${networkData.publicPods} / ${networkData.privatePods}`}
+                  subtitle="node visibility"
                 />
               </>
+            ) : (
+              Array.from({ length: 6 }).map((_, i) => (
+                <KpiCard key={i} title="---" value="---" />
+              ))
             )}
           </div>
         </div>
@@ -180,8 +280,8 @@ export default function NetworkPage() {
 
           <section className="lg:absolute lg:bottom-0 pb-12 w-fit z-10 relative">
             <div className="flex flex-col gap-y-8">
-              <TotalPods />
-              <NetworkStats />
+              <TotalPods data={networkData} isLoading={isNetworkLoading} />
+              <NetworkStats data={networkData} isLoading={isNetworkLoading} />
             </div>
           </section>
 
@@ -190,36 +290,95 @@ export default function NetworkPage() {
           </div>
         </div>
 
+        {/* Network Status Bar */}
+        <div className="mt-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-lg border border-white/10 bg-[#0b0b0b] p-4">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <div className="h-2 w-2 rounded-full bg-[#22c55e]" />
+              <span className="text-sm font-semibold text-[#E5E7EB]">
+                Network Status: Healthy
+              </span>
+            </div>
+            <div className="h-4 w-px bg-white/10" />
+            <span className="text-sm text-[#9CA3AF]">
+              Updated {lastUpdatedText}
+            </span>
+          </div>
+          <button
+            onClick={handleRefresh}
+            disabled={isFetching || isRefreshing}
+            className="flex items-center gap-2 rounded-lg border border-white/10 bg-black px-4 py-2 text-sm font-medium text-[#E5E7EB] transition-all hover:border-[#1E40AF] hover:bg-[#1E40AF]/10 disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Refresh network data"
+          >
+            <RefreshCw className={`h-4 w-4 transition-transform ${isFetching || isRefreshing ? "animate-spin" : ""}`} />
+            <span>Refresh in {countdown}s</span>
+          </button>
+        </div>
+
         {/* KPI Cards Section */}
-        <div className="mt-8 grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
-          {isLoading ? (
+        <div className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
+          {isNetworkLoading ? (
             Array.from({ length: 6 }).map((_, i) => <KpiCardSkeleton key={i} />)
-          ) : (
+          ) : networkData ? (
             <>
               <KpiCard
-                title="Avg Storage Committed"
-                value={`${avgStorageCommitted} GB`}
+                title="Storage Committed"
+                value={formatStorageValue(networkData.totalStorageCommitted)}
+                tooltip={getFullStorageValue(networkData.totalStorageCommitted)}
               />
               <KpiCard
-                title="Avg Storage Used"
-                value={`${avgStorageUsed} GB`}
+                title="Storage Used"
+                value={formatStorageValue(networkData.totalStorageUsed)}
+                tooltip={getFullStorageValue(networkData.totalStorageUsed)}
+                subtitle={`${networkData.avgStorageUsagePercent > 0 ? networkData.avgStorageUsagePercent.toFixed(2) : '< 0.01'}% utilized`}
               />
               <KpiCard
-                title="Avg Usage"
-                value={`${avgUsagePercent}%`}
-                subtitle="utilization"
+                title="Avg Storage Per Pod"
+                value={formatStorageValue(avgStoragePerPod)}
+                tooltip={getFullStorageValue(avgStoragePerPod)}
+                subtitle="committed"
               />
               <KpiCard
                 title="Avg Uptime"
-                value={`${avgUptime} days`}
+                value={formatUptime(networkData.avgUptime)}
+                subtitle={`${networkData.avgUptime.toLocaleString()} seconds`}
               />
               <KpiCard
-                title="Avg Health"
-                value={`${avgHealth}%`}
+                title="Health Score"
+                value={`${networkData.healthScore}%`}
+                valueColor={getHealthColor(networkData.healthScore)}
               />
               <KpiCard
                 title="Public / Private Pods"
-                value={`${publicCount} / ${privateCount}`}
+                value={`${networkData.publicPods} / ${networkData.privatePods}`}
+                subtitle="node visibility"
+              />
+            </>
+          ) : (
+            <>
+              <KpiCard
+                title="Storage Committed"
+                value="---"
+              />
+              <KpiCard
+                title="Storage Used"
+                value="---"
+              />
+              <KpiCard
+                title="Avg Storage Per Pod"
+                value="---"
+              />
+              <KpiCard
+                title="Avg Uptime"
+                value="---"
+              />
+              <KpiCard
+                title="Health Score"
+                value="---"
+              />
+              <KpiCard
+                title="Public / Private Pods"
+                value="---"
               />
             </>
           )}
@@ -228,19 +387,19 @@ export default function NetworkPage() {
         {/* Charts Section */}
         <div className="mt-8 grid grid-cols-1 gap-4 lg:grid-cols-3">
           <div className="lg:col-span-2">
-            {isLoading ? <ChartSkeleton /> : <NetworkHealthChart />}
+            {isNetworkLoading ? <ChartSkeleton /> : <NetworkHealthChart />}
           </div>
           <div className="lg:col-span-1">
-            {isLoading ? <ChartSkeleton /> : <VersionDistributionChart data={versionData} />}
+            {isNetworkLoading ? <ChartSkeleton /> : <VersionDistributionChart data={versionData} />}
           </div>
         </div>
 
         {/* Storage Distribution Section */}
         <div className="mt-4">
-          {isLoading ? <ChartSkeleton /> : <StorageDistributionChart data={storageData} />}
+          {isNetworkLoading ? <ChartSkeleton /> : <StorageDistributionChart data={storageData} />}
         </div>
         <div className="mt-6 mb-6">
-          {isLoading ? <ChartSkeleton /> : <PodsGrowthChart />}
+          {isNetworkLoading ? <ChartSkeleton /> : <PodsGrowthChart />}
         </div>
 
         {/* Advanced Metrics Section */}
