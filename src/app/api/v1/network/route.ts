@@ -6,7 +6,7 @@ import { buildCacheKey } from "@/lib/api";
 import { withCache } from "@/lib/cache";
 import { successResponse, handleError } from "@/lib/api";
 import { mapNetworkStatsToDto } from "@/lib/mappers";
-import { calculateHealthScore } from "@/lib/health-score";
+import { calculateHealthScore, getHealthStatus } from "@/lib/health-score";
 import type {
   NetworkStats,
   NetworkHybridResponse,
@@ -48,12 +48,10 @@ export async function GET(request: NextRequest) {
           const podsResult = await prpcClient.getPodsWithStats();
 
           const validPods = podsResult.pods.filter(
-            (pod) => pod.pubkey && pod.pubkey.length > 0
+            (pod) => pod.pubkey && pod.pubkey.length > 0 && pod.address && pod.address.trim() !== ''
           );
 
           const now = Date.now() / 1000;
-          const fiveMinutesAgo = now - 300;
-          const oneHourAgo = now - 3600;
 
           let onlineCount = 0;
           let degradedCount = 0;
@@ -67,9 +65,19 @@ export async function GET(request: NextRequest) {
           let totalHealthScore = 0;
 
           validPods.forEach((pod) => {
-            if (pod.last_seen_timestamp >= fiveMinutesAgo) {
+            const lastSeenMinutes = (now - pod.last_seen_timestamp) / 60;
+            const healthScore = calculateHealthScore({
+              storageUsagePercent: pod.storage_usage_percent || 0,
+              uptime: pod.uptime,
+              lastSeenMinutes,
+            });
+            
+            const status = getHealthStatus(healthScore);
+            
+            // Count by status (matching Supabase function logic)
+            if (status === "ONLINE") {
               onlineCount++;
-            } else if (pod.last_seen_timestamp >= oneHourAgo) {
+            } else if (status === "DEGRADED") {
               degradedCount++;
             } else {
               offlineCount++;
@@ -84,13 +92,6 @@ export async function GET(request: NextRequest) {
             totalStorageCommitted += BigInt(pod.storage_committed || 0);
             totalStorageUsed += BigInt(pod.storage_used || 0);
             totalUptime += pod.uptime;
-
-            const lastSeenMinutes = (now - pod.last_seen_timestamp) / 60;
-            const healthScore = calculateHealthScore({
-              storageUsagePercent: pod.storage_usage_percent || 0,
-              uptime: pod.uptime,
-              lastSeenMinutes,
-            });
             totalHealthScore += healthScore;
           });
 

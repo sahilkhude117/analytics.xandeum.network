@@ -9,7 +9,7 @@ import { ArrowRight, RefreshCw } from "lucide-react";
 import KpiCardSkeleton from "@/components/skeletons/kpi-card-skeleton";
 import ChartSkeleton from "@/components/skeletons/chart-skeleton";
 import { useNetworkData } from "@/hooks/use-network-data";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import type { NetworkStats, NetworkHybridResponse } from "@/lib/types";
 import { formatDistanceToNow } from "date-fns";
 import { formatUptime, formatStorageValue, getFullStorageValue } from "@/lib/formatters";
@@ -18,15 +18,47 @@ import { useQueryClient } from "@tanstack/react-query";
 
 export default function Home() {
   const [lastRefreshTime, setLastRefreshTime] = useState<Date | null>(null);
+  const [countdown, setCountdown] = useState(30);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const queryClient = useQueryClient();
   
   const { data, isLoading, isFetching } = useNetworkData();
 
   const handleRefresh = async () => {
+    setIsRefreshing(true);
     setLastRefreshTime(new Date());
-    const freshData = await apiClient.getNetworkStats(true);
-    queryClient.setQueryData(["network"], freshData);
+    setCountdown(30); // Reset timer immediately when manually refreshed
+    try {
+      const freshData = await apiClient.getNetworkStats(true);
+      queryClient.setQueryData(["network"], freshData);
+    } finally {
+      setIsRefreshing(false);
+    }
   };
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          // Trigger refresh
+          (async () => {
+            setIsRefreshing(true);
+            setLastRefreshTime(new Date());
+            try {
+              const freshData = await apiClient.getNetworkStats(true);
+              queryClient.setQueryData(["network"], freshData);
+            } finally {
+              setIsRefreshing(false);
+            }
+          })();
+          return 30;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [queryClient]);
 
   const networkData = useMemo(() => {
     if (!data) return null;
@@ -41,6 +73,8 @@ export default function Home() {
       return {
         totalPods: live?.totalPNodes ?? 0,
         onlinePods: live?.onlinePNodes ?? 0,
+        degradedPods: live?.degradedPNodes ?? 0,
+        offlinePods: live?.offlinePNodes ?? 0,
         totalStorageCommitted: live?.totalStorageCommitted ?? "0",
         totalStorageUsed: live?.totalStorageUsed ?? "0",
         avgStorageUsagePercent: live?.avgStorageUsagePercent ?? 0,
@@ -53,6 +87,8 @@ export default function Home() {
       return {
         totalPods: stats.totalPNodes,
         onlinePods: stats.onlinePNodes,
+        degradedPods: stats.degradedPNodes,
+        offlinePods: stats.offlinePNodes,
         totalStorageCommitted: stats.totalStorageCommitted,
         totalStorageUsed: stats.totalStorageUsed,
         avgStorageUsagePercent: stats.avgStorageUsagePercent,
@@ -68,6 +104,19 @@ export default function Home() {
     const committed = BigInt(networkData.totalStorageCommitted);
     const avgBytes = Number(committed) / networkData.totalPods;
     return avgBytes.toString();
+  }, [networkData]);
+
+  const nodeStatusData = useMemo(() => {
+    if (!networkData) return undefined;
+    const { totalPods, onlinePods, degradedPods, offlinePods } = networkData;
+    const invalidPods = totalPods - (onlinePods + degradedPods + offlinePods);
+    
+    return [
+      { name: "Online", value: onlinePods, color: "#008000" },
+      { name: "Degraded", value: degradedPods, color: "#FACC15" },
+      { name: "Offline", value: offlinePods, color: "#EF4444" },
+      { name: "Invalid", value: invalidPods, color: "#9333EA" },
+    ].filter(item => item.value > 0); // Only show categories with values
   }, [networkData]);
 
   const lastUpdatedText = useMemo(() => {
@@ -96,12 +145,12 @@ export default function Home() {
           </div>
           <button
             onClick={handleRefresh}
-            disabled={isFetching}
+            disabled={isFetching || isRefreshing}
             className="ml-auto flex items-center gap-2 rounded-lg border border-white/10 bg-[#0b0b0b] px-4 py-2 text-sm font-medium text-[#E5E7EB] transition-all hover:border-[#1E40AF] hover:bg-[#1E40AF]/10 disabled:opacity-50 disabled:cursor-not-allowed"
             title="Refresh network data"
           >
-            <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
-            <span>Refresh</span>
+            <RefreshCw className={`h-4 w-4 transition-transform ${isFetching || isRefreshing ? "animate-spin" : ""}`} />
+            <span>Refresh in {countdown}s</span>
           </button>
         </div>
         <p className="mt-1 text-sm text-[#9CA3AF]">
@@ -160,7 +209,7 @@ export default function Home() {
           {isLoading ? <ChartSkeleton /> : <StorageUtilizationChart />}
         </div>
         <div className="lg:col-span-1">
-          {isLoading ? <ChartSkeleton /> : <NodeStatusChart />}
+          {isLoading ? <ChartSkeleton /> : <NodeStatusChart data={nodeStatusData} />}
         </div>
       </div>
 
