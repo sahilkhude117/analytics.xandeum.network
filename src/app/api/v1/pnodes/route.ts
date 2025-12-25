@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
       status: searchParams.get("status") || undefined,
       version: searchParams.get("version") || undefined,
       country: searchParams.get("country") || undefined,
+      storageCommitted: searchParams.get("storageCommitted") || undefined,
       search: searchParams.get("search") || undefined,
       sortBy: searchParams.get("sortBy") || undefined,
       sortDir: searchParams.get("sortDir") || undefined,
@@ -33,6 +34,7 @@ export async function GET(request: NextRequest) {
       query.status || "all",
       query.version || "all",
       query.country || "all",
+      query.storageCommitted || "all",
       query.search || "all",
       query.sortBy,
       query.sortDir,
@@ -55,6 +57,16 @@ export async function GET(request: NextRequest) {
 
         if (query.country) {
           where.country = query.country;
+        }
+
+        if (query.storageCommitted) {
+          const match = query.storageCommitted.match(/^([0-9.]+)\s*(TB|GB)$/i);
+          if (match) {
+            const value = parseFloat(match[1]);
+            const unit = match[2].toUpperCase();
+            const bytes = unit === "TB" ? value * 1024 * 1024 * 1024 * 1024 : value * 1024 * 1024 * 1024;
+            where.storageCommitted = BigInt(Math.floor(bytes));
+          }
         }
 
         if (query.search) {

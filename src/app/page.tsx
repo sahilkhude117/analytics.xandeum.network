@@ -119,7 +119,7 @@ export default function Home() {
       { name: "Degraded", value: degradedPods, color: "#FACC15" },
       { name: "Offline", value: offlinePods, color: "#EF4444" },
       { name: "Invalid", value: invalidPods, color: "#9333EA" },
-    ].filter(item => item.value > 0); // Only show categories with values
+    ].filter(item => item.value >= 0); // Only show categories with values
   }, [networkData]);
 
   const lastUpdatedText = useMemo(() => {

@@ -32,9 +32,10 @@ export const PNodeListQuerySchema = z.object({
   status: z.nativeEnum(Status).optional(),
   version: z.string().optional(),
   country: z.string().optional(),
+  storageCommitted: z.string().optional(), // Filter by storage committed (e.g., "1TB", "500GB")
   search: z.string().optional(), // pubkey prefix or IP
   sortBy: z
-    .enum(["lastSeenAt", "storageUsagePercent", "uptime", "healthScore"])
+    .enum(["lastSeenAt", "storageUsagePercent", "uptime", "healthScore", "storageCommitted"])
     .default("lastSeenAt"),
   sortDir: z.enum(["asc", "desc"]).default("desc"),
 });

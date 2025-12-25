@@ -1,43 +1,27 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
-  useReactTable,
+  flexRender,
   getCoreRowModel,
   getSortedRowModel,
-  flexRender,
+  useReactTable,
   createColumnHelper,
-  SortingState,
+  type SortingState,
 } from "@tanstack/react-table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { ChevronDown, Copy, Check } from "lucide-react";
-import TableSkeleton from "../skeletons/table-skeleton";
+import { ChevronDown, Copy, Check, HelpCircle } from "lucide-react";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
-
-type SortOption = "reliability" | "storage" | "uptime";
-
-interface PodPerformance {
-  pubkey: string;
-  ip: string;
-  committed: number; // TB
-  used: number; // TB
-  usedPercentage: number;
-  uptime: number; // percentage
-  healthScore: number;
-  version: string;
-}
+import { useTopPerformers, type PerformanceSortOption, type TopPerformersParams } from "@/hooks/use-top-performers";
+import { formatStorageValue } from "@/lib/formatters";
+import TableSkeleton from "@/components/skeletons/table-skeleton";
+import { useRouter } from "next/navigation";
+import type { PNodeListItem } from "@/lib/types";
 
 interface TopPerformersTableProps {
-  data?: PodPerformance[];
   isLoading?: boolean;
 }
 
-const columnHelper = createColumnHelper<PodPerformance>();
+const columnHelper = createColumnHelper<PNodeListItem>();
 
 const createColumns = (
   isCopied: (rowId: string, field: string) => boolean,
@@ -47,69 +31,80 @@ const createColumns = (
     header: "Pubkey",
     cell: (info) => {
       const rowId = info.row.id;
+      const value = info.getValue();
       const copied = isCopied(rowId, "pubkey");
+      
+      if (!value) return <span className="text-sm text-[#9CA3AF]">N/A</span>;
+      
       return (
         <div className="flex items-center gap-2">
           <span className="font-mono text-md text-[#E5E7EB]">
-            {info.getValue().slice(0, 8)}...{info.getValue().slice(-6)}
+            {value.slice(0, 8)}...{value.slice(-8)}
           </span>
           <button
-            onClick={() => copyToClipboard(info.getValue(), rowId, "pubkey")}
+            onClick={(e) => {
+              e.stopPropagation();
+              copyToClipboard(value, rowId, "pubkey");
+            }}
             className="opacity-0 group-hover:opacity-100 transition-opacity"
             title="Copy pubkey"
           >
             {copied ? (
-              <Check className="h-3.5 w-3.5 text-[#22C55E]" />
+              <Check className="h-3.5 w-3.5 text-green-500" />
             ) : (
-              <Copy className="h-3.5 w-3.5 text-[#9CA3AF] hover:text-[#1E40AF]" />
+              <Copy className="h-3.5 w-3.5 text-[#9CA3AF] hover:text-white" />
             )}
           </button>
         </div>
       );
     },
   }),
-  columnHelper.accessor("ip", {
+  columnHelper.accessor("ipAddress", {
     header: "Address",
     cell: (info) => {
       const rowId = info.row.id;
+      const value = info.getValue();
       const copied = isCopied(rowId, "ip");
       return (
         <div className="flex items-center gap-2">
           <span className="font-mono text-md text-[#9CA3AF]">
-            {info.getValue()}:9001
+            {value}:9001
           </span>
           <button
-            onClick={() => copyToClipboard(info.getValue(), rowId, "ip")}
+            onClick={(e) => {
+              e.stopPropagation();
+              copyToClipboard(value, rowId, "ip");
+            }}
             className="opacity-0 group-hover:opacity-100 transition-opacity"
             title="Copy IP address"
           >
             {copied ? (
-              <Check className="h-3.5 w-3.5 text-[#22C55E]" />
+              <Check className="h-3.5 w-3.5 text-green-500" />
             ) : (
-              <Copy className="h-3.5 w-3.5 text-[#9CA3AF] hover:text-[#1E40AF]" />
+              <Copy className="h-3.5 w-3.5 text-[#9CA3AF] hover:text-white" />
             )}
           </button>
         </div>
       );
     },
   }),
-  columnHelper.accessor("committed", {
+  columnHelper.accessor("storageCommitted", {
     header: "Committed",
     cell: (info) => (
       <span className="text-base text-[#E5E7EB]">
-        {info.getValue().toFixed(2)} TB
+        {formatStorageValue(info.getValue())}
       </span>
     ),
   }),
-  columnHelper.accessor("used", {
+  columnHelper.accessor("storageUsed", {
     header: "Used",
     cell: (info) => (
       <span className="text-base text-[#E5E7EB]">
-        {info.getValue().toFixed(2)} TB
+        {formatStorageValue(info.getValue())}
       </span>
     ),
   }),
-  columnHelper.accessor("usedPercentage", {
+  columnHelper.accessor("storageUsagePercent", {
     header: "Usage %",
     cell: (info) => {
       const value = info.getValue();
@@ -124,12 +119,44 @@ const createColumns = (
   }),
   columnHelper.accessor("uptime", {
     header: "Uptime",
-    cell: (info) => (
-      <span className="text-base text-[#E5E7EB]">{info.getValue().toFixed(1)}%</span>
-    ),
+    cell: (info) => {
+      const uptimeSeconds = info.getValue();
+      const uptimeDays = uptimeSeconds / (24 * 60 * 60);
+      
+      if (uptimeDays < 1) {
+        const hours = Math.floor(uptimeSeconds / 3600);
+        return <span className="text-base text-[#E5E7EB]">{hours}h</span>;
+      }
+      
+      return (
+        <span className="text-base text-[#E5E7EB]">
+          {uptimeDays.toFixed(1)}d
+        </span>
+      );
+    },
   }),
   columnHelper.accessor("healthScore", {
-    header: "Health Score",
+    header: () => (
+      <div className="flex items-center gap-1.5 group/tooltip relative">
+        <span>Health Score</span>
+        <HelpCircle className="h-3.5 w-3.5 text-[#9CA3AF]" />
+        <div className="invisible group-hover/tooltip:visible absolute left-0 top-full mt-2 w-80 rounded-lg border border-white/10 bg-[#1a1a1a] p-4 text-xs font-normal normal-case tracking-normal shadow-lg z-50">
+          <div className="space-y-2">
+            <p className="text-[#E5E7EB] font-semibold">Health Score Calculation (Max: 100)</p>
+            <ul className="space-y-1 text-[#9CA3AF]">
+              <li>• <span className="text-[#E5E7EB]">Online Status (40pts)</span> - Node seen in last 5 minutes</li>
+              <li>• <span className="text-[#E5E7EB]">Last Seen (20pts)</span> - Recent activity (&lt;1min = 20pts)</li>
+              <li>• <span className="text-[#E5E7EB]">Storage Health (15pts)</span> - Optimal: 0-70% usage</li>
+              <li>• <span className="text-[#E5E7EB]">CPU Health (10pts)</span> - Lower CPU is better (optional)</li>
+              <li>• <span className="text-[#E5E7EB]">Uptime (15pts)</span> - Longer uptime = more stable</li>
+            </ul>
+            <div className="pt-2 border-t border-white/10 text-[#9CA3AF]">
+              <p><span className="text-green-400">90+:</span> Excellent | <span className="text-yellow-400">70-89:</span> Good | <span className="text-red-400">&lt;70:</span> Fair/Poor</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    ),
     cell: (info) => {
       const value = info.getValue();
       const color =
@@ -149,236 +176,20 @@ const createColumns = (
   }),
 ];
 
-// Mock data - 20 pods for sorting variations
-const defaultData: PodPerformance[] = [
-  {
-    pubkey: "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU",
-    ip: "203.0.113.45",
-    committed: 1.2,
-    used: 0.95,
-    usedPercentage: 79.2,
-    uptime: 99.8,
-    healthScore: 98,
-    version: "v0.7.2",
-  },
-  {
-    pubkey: "9pQNW76Yh4aUExqKVmFLqV4CfVqfF1HNjWzv8oGXfJgC",
-    ip: "198.51.100.23",
-    committed: 2.4,
-    used: 1.87,
-    usedPercentage: 77.9,
-    uptime: 99.5,
-    healthScore: 97,
-    version: "v0.7.2",
-  },
-  {
-    pubkey: "3kMbZe5gKzRPxWrF7dNqY6JhPvTuCxQsL9aVmBnHfDpE",
-    ip: "192.0.2.178",
-    committed: 0.8,
-    used: 0.58,
-    usedPercentage: 72.5,
-    uptime: 99.9,
-    healthScore: 96,
-    version: "v0.7.1",
-  },
-  {
-    pubkey: "5nPqX8jKdLwRvYtH2sBmZ4FgNcQeUaJiVpMrDoGhTfWx",
-    ip: "203.0.113.89",
-    committed: 1.5,
-    used: 1.12,
-    usedPercentage: 74.7,
-    uptime: 98.7,
-    healthScore: 95,
-    version: "v0.7.2",
-  },
-  {
-    pubkey: "8rTyB4fGhXjKqWsL9mVnCdPzNuEaQoRxJiDpMcHgFtYv",
-    ip: "198.51.100.67",
-    committed: 3.0,
-    used: 2.31,
-    usedPercentage: 77.0,
-    uptime: 99.2,
-    healthScore: 94,
-    version: "v0.7.2",
-  },
-  {
-    pubkey: "2wQzA6kPjLvYxHmDrNsFbCgTuXeRoEnKpMiJqBhVtGcU",
-    ip: "192.0.2.134",
-    committed: 0.6,
-    used: 0.41,
-    usedPercentage: 68.3,
-    uptime: 99.6,
-    healthScore: 93,
-    version: "v0.7.1",
-  },
-  {
-    pubkey: "6sVxD3nKmPjQrYzL8tWbFaHgCuNeXoJpRiMqEvTdGfBw",
-    ip: "203.0.113.156",
-    committed: 1.8,
-    used: 1.35,
-    usedPercentage: 75.0,
-    uptime: 98.4,
-    healthScore: 92,
-    version: "v0.7.2",
-  },
-  {
-    pubkey: "4mUyF5pLnJwQsXzH9tRbCeKgDvPaNoGqRiMjTxBdYhWc",
-    ip: "198.51.100.201",
-    committed: 2.1,
-    used: 1.61,
-    usedPercentage: 76.7,
-    uptime: 99.1,
-    healthScore: 91,
-    version: "v0.7.2",
-  },
-  {
-    pubkey: "7pVzE6rNkMqTxYwL3sWbFdHgCuPeXnJoRiQjDvMaGfBy",
-    ip: "192.0.2.89",
-    committed: 1.0,
-    used: 0.73,
-    usedPercentage: 73.0,
-    uptime: 98.9,
-    healthScore: 90,
-    version: "v0.7.1",
-  },
-  {
-    pubkey: "9qXzG8tPmNrLyZwH4vWbFeKgDuQeYoJpSiRjEvNcHfCx",
-    ip: "203.0.113.92",
-    committed: 2.8,
-    used: 2.15,
-    usedPercentage: 76.8,
-    uptime: 99.3,
-    healthScore: 89,
-    version: "v0.7.2",
-  },
-  {
-    pubkey: "3nWyH6sQoKtMzYxL5vXbGfJhEuReZpKqTiSjFwOdIgDz",
-    ip: "198.51.100.45",
-    committed: 1.3,
-    used: 0.97,
-    usedPercentage: 74.6,
-    uptime: 98.2,
-    healthScore: 88,
-    version: "v0.7.1",
-  },
-  {
-    pubkey: "5oYzJ8uRpLvNaZyM6wYbHgKiEvSeApLrUjTkGxPeJhEa",
-    ip: "192.0.2.167",
-    committed: 1.9,
-    used: 1.44,
-    usedPercentage: 75.8,
-    uptime: 99.0,
-    healthScore: 87,
-    version: "v0.7.2",
-  },
-  {
-    pubkey: "8qZaK9vTrNwObAzN7xZbIhLjFvTfBqMsVkUlHyQfKiGb",
-    ip: "203.0.113.234",
-    committed: 0.9,
-    used: 0.65,
-    usedPercentage: 72.2,
-    uptime: 98.5,
-    healthScore: 86,
-    version: "v0.7.1",
-  },
-  {
-    pubkey: "2mAbL7wUsOxPcBaN8yAbJiMkGvUgCrNtWlVmIzRgLjHc",
-    ip: "198.51.100.123",
-    committed: 2.6,
-    used: 1.98,
-    usedPercentage: 76.2,
-    uptime: 98.8,
-    healthScore: 85,
-    version: "v0.7.2",
-  },
-  {
-    pubkey: "6pCdM9xVtPyQdCbO9zBcKjNlHvWhDsOuXmWnJaShMkId",
-    ip: "192.0.2.78",
-    committed: 1.1,
-    used: 0.81,
-    usedPercentage: 73.6,
-    uptime: 97.9,
-    healthScore: 84,
-    version: "v0.7.1",
-  },
-  {
-    pubkey: "4nDeN8yWuQzReDbP8aCdLkOmIwXiEtPvYnXoKbTiNlJe",
-    ip: "203.0.113.56",
-    committed: 2.2,
-    used: 1.68,
-    usedPercentage: 76.4,
-    uptime: 98.6,
-    healthScore: 83,
-    version: "v0.7.2",
-  },
-  {
-    pubkey: "7oEfO9zXvRaSeEcQ9bDeNmPlJyYjFuQwZoYpLcUjOmKf",
-    ip: "198.51.100.189",
-    committed: 1.6,
-    used: 1.19,
-    usedPercentage: 74.4,
-    uptime: 99.4,
-    healthScore: 82,
-    version: "v0.7.1",
-  },
-  {
-    pubkey: "3mFgP8aYwSbTfFdR8cEeMnQmKzZkGvRxApZqMdVkPnLg",
-    ip: "192.0.2.145",
-    committed: 2.5,
-    used: 1.91,
-    usedPercentage: 76.4,
-    uptime: 98.1,
-    healthScore: 81,
-    version: "v0.7.2",
-  },
-  {
-    pubkey: "5nHhQ9bZxTcUgGeS9dFfOoRnLaAlHwSyBqArNeWlQoMh",
-    ip: "203.0.113.198",
-    committed: 1.4,
-    used: 1.04,
-    usedPercentage: 74.3,
-    uptime: 98.3,
-    healthScore: 80,
-    version: "v0.7.1",
-  },
-  {
-    pubkey: "8pJjR8cAxUdViHfT8eGgPpSnMbBmIxTzCrBsOfXmRpNi",
-    ip: "198.51.100.87",
-    committed: 1.7,
-    used: 1.27,
-    usedPercentage: 74.7,
-    uptime: 97.8,
-    healthScore: 79,
-    version: "v0.7.2",
-  },
-];
-
-const sortOptions: Record<SortOption, string> = {
-  reliability: "Reliability (Health)",
-  storage: "Storage Committed",
+const sortOptions: Record<PerformanceSortOption, string> = {
+  reliability: "Reliability",
+  storage: "Storage Used",
   uptime: "Uptime",
+  storageCommitted: "Storage Committed",
 };
 
-export function TopPerformersTable({ data = defaultData, isLoading = false }: TopPerformersTableProps) {
-  const [sortBy, setSortBy] = useState<SortOption>("reliability");
+export function TopPerformersTable({ isLoading: parentLoading = false }: TopPerformersTableProps) {
+  const [sortBy, setSortBy] = useState<PerformanceSortOption>("reliability");
   const { copyToClipboard, isCopied } = useCopyToClipboard();
-
-  // Sort and take top 10 based on selected option
-  const sortedData = useMemo(() => {
-    const sorted = [...data].sort((a, b) => {
-      switch (sortBy) {
-        case "reliability":
-          return b.healthScore - a.healthScore;
-        case "storage":
-          return b.committed - a.committed;
-        case "uptime":
-          return b.uptime - a.uptime;
-        default:
-          return 0;
-      }
-    });
-    return sorted.slice(0, 10);
-  }, [data, sortBy]);
+  const router = useRouter();
+  
+  const { data, isLoading: queryLoading } = useTopPerformers({ sortBy });
+  const isLoading = parentLoading || queryLoading;
 
   const [sorting, setSorting] = useState<SortingState>([]);
 
@@ -387,8 +198,10 @@ export function TopPerformersTable({ data = defaultData, isLoading = false }: To
     [isCopied, copyToClipboard]
   );
 
+  const tableData = useMemo(() => data?.items || [], [data]);
+
   const table = useReactTable({
-    data: sortedData,
+    data: tableData,
     columns,
     state: {
       sorting,
@@ -398,57 +211,42 @@ export function TopPerformersTable({ data = defaultData, isLoading = false }: To
     getSortedRowModel: getSortedRowModel(),
   });
 
+  const handleRowClick = (row: PNodeListItem) => {
+    if (row.pubkey) {
+      router.push(`/pods/${row.pubkey}`);
+    }
+  };
+
   return (
     <div className="rounded-lg border border-white/5 bg-[#0b0b0b] p-6">
       {isLoading ? (
         <TableSkeleton rows={10} />
       ) : (
         <>
-          {/* Header with Dropdown */}
+          {/* Header */}
           <div className="mb-6 flex items-center justify-between">
             <div>
-              <h3 className="text-lg font-medium text-[#E5E7EB]">
-                Top 10 Pods by {sortOptions[sortBy]}
-              </h3>
+              <h2 className="text-xl font-bold text-[#E5E7EB]">
+                Top Performers
+              </h2>
+              <p className="mt-1 text-sm text-[#9CA3AF]">
+                Top 10 pods by {sortOptions[sortBy].toLowerCase()}
+              </p>
             </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger className="flex items-center gap-2 rounded-lg border border-white/10 bg-[#0A0A0A] px-4 py-2 text-sm text-[#E5E7EB] transition-colors hover:bg-white/5 focus:outline-none focus:ring-0">
-                {sortOptions[sortBy]}
-                <ChevronDown className="h-4 w-4 text-[#9CA3AF]" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56 border-white/10 bg-[#0A0A0A]">
-                <DropdownMenuItem
-                  onClick={() => setSortBy("reliability")}
-                  className={`cursor-pointer text-sm ${
-                    sortBy === "reliability"
-                      ? "bg-[#1E40AF] text-white"
-                      : "text-[#E5E7EB] hover:bg-white/5"
-                  }`}
-                >
-                  Reliability (Health)
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setSortBy("storage")}
-                  className={`cursor-pointer text-sm ${
-                    sortBy === "storage"
-                      ? "bg-[#1E40AF] text-white"
-                      : "text-[#E5E7EB] hover:bg-white/5"
-                  }`}
-                >
-                  Storage Committed
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setSortBy("uptime")}
-                  className={`cursor-pointer text-sm ${
-                    sortBy === "uptime"
-                      ? "bg-[#1E40AF] text-white"
-                      : "text-[#E5E7EB] hover:bg-white/5"
-                  }`}
-                >
-                  Uptime
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <div className="relative">
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as PerformanceSortOption)}
+                className="appearance-none rounded-lg border border-white/10 bg-[#0b0b0b] px-4 py-2 pr-10 text-sm font-medium text-[#E5E7EB] transition-all hover:border-[#1E40AF] focus:border-[#1E40AF] focus:outline-none"
+              >
+                {Object.entries(sortOptions).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9CA3AF]" />
+            </div>
           </div>
 
           {/* Table */}
@@ -459,7 +257,7 @@ export function TopPerformersTable({ data = defaultData, isLoading = false }: To
                   {table.getFlatHeaders().map((header) => (
                     <th
                       key={header.id}
-                      className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-[#6B7280]"
+                      className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#9CA3AF]"
                     >
                       {flexRender(
                         header.column.columnDef.header,
@@ -470,16 +268,18 @@ export function TopPerformersTable({ data = defaultData, isLoading = false }: To
                 </tr>
               </thead>
               <tbody>
-                {table.getRowModel().rows.map((row, index) => (
+                {table.getRowModel().rows.map((row) => (
                   <tr
                     key={row.id}
-                    className={`group border-b border-white/5 transition-colors hover:bg-white/5 ${
-                      index === 0 ? "bg-[#1E40AF]/10" : ""
-                    }`}
+                    onClick={() => handleRowClick(row.original)}
+                    className="group cursor-pointer border-b border-white/5 transition-colors hover:bg-white/5"
                   >
                     {row.getVisibleCells().map((cell) => (
-                      <td key={cell.id} className="px-4 py-3">
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      <td key={cell.id} className="px-4 py-4">
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext()
+                        )}
                       </td>
                     ))}
                   </tr>
@@ -487,6 +287,12 @@ export function TopPerformersTable({ data = defaultData, isLoading = false }: To
               </tbody>
             </table>
           </div>
+
+          {tableData.length === 0 && (
+            <div className="py-12 text-center">
+              <p className="text-sm text-[#9CA3AF]">No pNodes found</p>
+            </div>
+          )}
         </>
       )}
     </div>
