@@ -73,14 +73,31 @@ export async function GET(request: NextRequest) {
           where.OR = [
             { pubkey: { startsWith: query.search } },
             { ipAddress: { contains: query.search } },
+            { city: { contains: query.search, mode: 'insensitive' } },
+            { country: { contains: query.search, mode: 'insensitive' } },
           ];
         }
 
+        // Map sortBy fields - rank is computed from healthScore
+        const sortField = query.sortBy === 'rank' ? 'healthScore' : query.sortBy;
         const orderBy: Prisma.PNodeOrderByWithRelationInput = {
-          [query.sortBy]: query.sortDir,
+          [sortField]: query.sortDir,
         };
 
         const total = await prisma.pNode.count({ where });
+
+        const allVersions = await prisma.pNode.findMany({
+          select: { version: true },
+          distinct: ['version'],
+          orderBy: { version: 'asc' },
+        });
+
+        const allCountries = await prisma.pNode.findMany({
+          where: { country: { not: null } },
+          select: { country: true },
+          distinct: ['country'],
+          orderBy: { country: 'asc' },
+        });
 
         const pnodes = await prisma.pNode.findMany({
           where,
@@ -102,6 +119,7 @@ export async function GET(request: NextRequest) {
             uptime: true,
             lastSeenAt: true,
             healthScore: true,
+            isPublic: true,
           },
         });
 
@@ -120,6 +138,7 @@ export async function GET(request: NextRequest) {
           uptime: pnode.uptime,
           lastSeenAt: pnode.lastSeenAt.toISOString(),
           healthScore: pnode.healthScore,
+          isPublic: pnode.isPublic,
         }));
 
         const response: PaginatedResponse<PNodeListItem> = {
@@ -129,6 +148,10 @@ export async function GET(request: NextRequest) {
             pageSize: query.pageSize,
             total,
             totalPages: Math.ceil(total / query.pageSize),
+          },
+          filters: {
+            availableVersions: allVersions.map(v => v.version),
+            availableCountries: allCountries.map(c => c.country).filter((c): c is string => c !== null),
           },
         };
 

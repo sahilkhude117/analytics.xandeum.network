@@ -25,6 +25,10 @@ export interface PaginationMeta {
 export interface PaginatedResponse<T> {
   items: T[];
   pagination: PaginationMeta;
+  filters?: {
+    availableVersions: string[];
+    availableCountries: string[];
+  };
 }
 
 export interface PNodeListItem {
@@ -42,6 +46,7 @@ export interface PNodeListItem {
   uptime: number;
   lastSeenAt: string; // ISO timestamp
   healthScore: number;
+  isPublic: boolean;
 }
 
 export interface PNodeDetail extends PNodeListItem {

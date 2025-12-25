@@ -3,7 +3,7 @@ import type { NetworkStats, NetworkHybridResponse, NetworkHistory, PaginatedResp
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 export type TimeRange = "1h" | "6h" | "24h" | "7d" | "30d";
-export type SortField = "lastSeenAt" | "storageUsagePercent" | "uptime" | "healthScore" | "storageCommitted";
+export type SortField = "rank" | "country" | "lastSeenAt" | "storageUsagePercent" | "storageUsed" | "uptime" | "healthScore" | "storageCommitted";
 export type SortDirection = "asc" | "desc";
 
 export interface PNodesListParams {

@@ -1,75 +1,158 @@
 "use client";
 
 import { PodsTable } from "@/components/tables/pods-table";
-import { useState, useEffect } from "react";
-
-const generateMockPods = () => {
-  const statuses = ["ONLINE", "DEGRADED", "OFFLINE", "INVALID"] as const;
-  const visibilities = ["PUBLIC", "PRIVATE"] as const;
-  const versions = ["v0.7.1", "v0.7.2", "v0.8.0"];
-  const cities = ["New York", "London", "Tokyo", "Singapore", "Frankfurt"];
-  const countries = ["USA", "UK", "Japan", "Singapore", "Germany"];
-
-  const pods = Array.from({ length: 50 }, (_, i) => ({
-    id: `pod-${i}`,
-    rank: 0, // Will be calculated below
-    pubkey: `${Math.random().toString(36).substring(2, 10)}${Math.random().toString(36).substring(2, 10)}${Math.random().toString(36).substring(2, 10)}${Math.random().toString(36).substring(2, 10)}`,
-    ip: `${Math.floor(Math.random() * 256)}.${Math.floor(Math.random() * 256)}.${Math.floor(Math.random() * 256)}.${Math.floor(Math.random() * 256)}`,
-    port: 9001,
-    status: statuses[Math.floor(Math.random() * statuses.length)],
-    visibility: visibilities[Math.floor(Math.random() * visibilities.length)],
-    version: versions[Math.floor(Math.random() * versions.length)],
-    storageUsed: Math.floor(Math.random() * 180) + 20,
-    storageCommitted: Math.floor(Math.random() * 100) + 200,
-    usagePercent: Math.floor(Math.random() * 90) + 10,
-    uptime: Math.floor(Math.random() * 2592000) + 3600, // 1 hour to 30 days
-    healthScore: Math.floor(Math.random() * 50) + 50,
-    lastSeen: new Date(Date.now() - Math.random() * 3600000), // Last hour
-    city: cities[Math.floor(Math.random() * cities.length)],
-    country: countries[Math.floor(Math.random() * countries.length)],
-  }));
-
-  // Sort by healthScore (desc), then by storageCommitted (desc) for ranking
-  const sortedPods = [...pods].sort((a, b) => {
-    if (b.healthScore !== a.healthScore) {
-      return b.healthScore - a.healthScore;
-    }
-    return b.storageCommitted - a.storageCommitted;
-  });
-
-  // Assign ranks
-  sortedPods.forEach((pod, index) => {
-    pod.rank = index + 1;
-  });
-
-  return pods;
-};
-
-const mockPodsData = generateMockPods();
+import { useMemo, useState, useCallback, useEffect } from "react";
+import { apiClient, SortField, SortDirection } from "@/lib/api-client";
+import { useQuery } from "@tanstack/react-query";
+import type { PNodeListItem } from "@/lib/types";
 
 export default function PodsPage() {
-  const [isLoading, setIsLoading] = useState(true);
-  const mockPods = mockPodsData;
+  const [page, setPage] = useState(1);
+  const [allPods, setAllPods] = useState<PNodeListItem[]>([]);
+  const pageSize = 50;
+
+  const [sortBy, setSortBy] = useState<SortField>("healthScore");
+  const [sortDir, setSortDir] = useState<SortDirection>("desc");
+  const [statusFilter, setStatusFilter] = useState<string | undefined>();
+  const [versionFilter, setVersionFilter] = useState<string | undefined>();
+  const [countryFilter, setCountryFilter] = useState<string | undefined>();
+  const [searchFilter, setSearchFilter] = useState<string | undefined>();
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 2000);
+    setPage(1);
+    setAllPods([]);
+  }, [sortBy, sortDir, statusFilter, versionFilter, countryFilter, searchFilter]);
 
-    return () => clearTimeout(timer);
+  const { data, isLoading, error, isFetching } = useQuery({
+    queryKey: ["pods-list", page, sortBy, sortDir, statusFilter, versionFilter, countryFilter, searchFilter],
+    queryFn: () =>
+      apiClient.getPnodesList({
+        page,
+        pageSize,
+        sortBy,
+        sortDir,
+        status: statusFilter,
+        version: versionFilter,
+        country: countryFilter,
+        search: searchFilter,
+      }),
+    staleTime: 30 * 1000,
+  });
+
+  useEffect(() => {
+    if (data?.items && data.items.length > 0) {
+      setAllPods((prev) => {
+        const existingIds = new Set(prev.map((p) => p.pubkey));
+        const newItems = data.items.filter((item) => !existingIds.has(item.pubkey));
+        return [...prev, ...newItems];
+      });
+    }
+  }, [data]);
+
+  const pods = useMemo(() => {
+    return allPods.map((item, index) => ({
+      id: item.pubkey || `unknown-${index}`,
+      rank: index + 1,
+      pubkey: item.pubkey || "Unknown",
+      ip: item.ipAddress.split(":")[0] || item.ipAddress,
+      port: parseInt(item.ipAddress.split(":")[1]) || 9001,
+      status: item.status as "ONLINE" | "DEGRADED" | "OFFLINE" | "INVALID",
+      visibility: item.isPublic ? "PUBLIC" as const : "PRIVATE" as const,
+      version: item.version,
+      storageUsed: parseFloat(item.storageUsed) / (1024 * 1024 * 1024),
+      storageCommitted: parseFloat(item.storageCommitted) / (1024 * 1024 * 1024),
+      usagePercent: item.storageUsagePercent,
+      uptime: item.uptime,
+      healthScore: item.healthScore,
+      lastSeen: new Date(item.lastSeenAt),
+      city: item.city || undefined,
+      country: item.country || undefined,
+    }));
+  }, [allPods]);
+
+  const handleLoadMore = useCallback(() => {
+    if (data && page < data.pagination.totalPages) {
+      setPage((prev) => prev + 1);
+    }
+  }, [data, page]);
+
+  const handleSortChange = useCallback((columnId: string) => {
+    const columnToFieldMap: Record<string, SortField> = {
+      rank: "rank" as SortField,
+      country: "country" as SortField,
+      storage: "storageCommitted" as SortField,
+      storageCommitted: "storageCommitted" as SortField,
+      storageUsed: "storageUsed" as SortField,
+      storageUsagePercent: "storageUsagePercent" as SortField,
+      healthScore: "healthScore" as SortField,
+    };
+    
+    const newSortBy = columnToFieldMap[columnId] || (columnId as SortField);
+    if (sortBy === newSortBy) {
+      setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortBy(newSortBy);
+      setSortDir("desc");
+    }
+  }, [sortBy]);
+
+  const handleFilterChange = useCallback((filters: {
+    status?: string[];
+    version?: string[];
+    country?: string[];
+    search?: string;
+  }) => {
+    setStatusFilter(filters.status && filters.status.length > 0 ? filters.status[0] : undefined);
+    setVersionFilter(filters.version && filters.version.length > 0 ? filters.version[0] : undefined);
+    setCountryFilter(filters.country && filters.country.length > 0 ? filters.country[0] : undefined);
+    setSearchFilter(filters.search && filters.search.trim() !== "" ? filters.search : undefined);
   }, []);
+
+  const handleResetAll = useCallback(() => {
+    setSortBy("healthScore");
+    setSortDir("desc");
+    setStatusFilter(undefined);
+    setVersionFilter(undefined);
+    setCountryFilter(undefined);
+    setSearchFilter(undefined);
+  }, []);
+
+  const hasMore = data ? page < data.pagination.totalPages : false;
 
   return (
     <main className="container mx-auto px-6 py-8">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-[#E5E7EB]">Pods</h1>
+        <h1 className="text-2xl font-bold text-[#E5E7EB]">All pNodes</h1>
         <p className="mt-1 text-sm text-[#9CA3AF]">
-          All registered pNodes in the Xandeum network
+          {isLoading && page === 1
+            ? "Loading pNodes..."
+            : `${pods.length}${hasMore ? '+' : ''} of ${data?.pagination.total || 0} pNodes`}
         </p>
       </div>
 
+      {/* Error State */}
+      {error && (
+        <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-4 text-red-400">
+          <p className="font-medium">Failed to load pods</p>
+          <p className="text-sm">{error.message}</p>
+        </div>
+      )}
+
       {/* Table */}
-      <PodsTable data={mockPods} isLoading={isLoading} />
+      <PodsTable
+        data={pods}
+        isLoading={isLoading && page === 1}
+        onLoadMore={handleLoadMore}
+        hasMore={hasMore}
+        isLoadingMore={isFetching}
+        onSortChange={handleSortChange}
+        sortBy={sortBy}
+        sortDir={sortDir}
+        onFilterChange={handleFilterChange}
+        onResetAll={handleResetAll}
+        availableVersions={data?.filters?.availableVersions}
+        availableCountries={data?.filters?.availableCountries}
+      />
     </main>
   );
 }
