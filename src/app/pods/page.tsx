@@ -5,6 +5,8 @@ import { useMemo, useState, useCallback, useEffect } from "react";
 import { apiClient, SortField, SortDirection } from "@/lib/api-client";
 import { useQuery } from "@tanstack/react-query";
 import type { PNodeListItem } from "@/lib/types";
+import { Download } from "lucide-react";
+import { exportPodsToExcel } from "@/lib/export-utils";
 
 export default function PodsPage() {
   const [page, setPage] = useState(1);
@@ -119,15 +121,33 @@ export default function PodsPage() {
 
   const hasMore = data ? page < data.pagination.totalPages : false;
 
+  const handleExport = useCallback(() => {
+    if (pods.length === 0) {
+      alert("No data to export");
+      return;
+    }
+    exportPodsToExcel(pods, "pods-data");
+  }, [pods]);
+
   return (
     <main className="container mx-auto px-6 py-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-[#E5E7EB]">All Pods</h1>
-        <p className="mt-1 text-sm text-[#9CA3AF]">
-          {isLoading && page === 1
-            ? "Loading pNodes...": ""
-          }
-        </p>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-[#E5E7EB]">All Pods</h1>
+          <p className="mt-1 text-sm text-[#9CA3AF]">
+            {isLoading && page === 1
+              ? "Loading pNodes...": ""
+            }
+          </p>
+        </div>
+        <button
+          onClick={handleExport}
+          disabled={isLoading || pods.length === 0}
+          className="flex items-center gap-2 rounded-lg border border-white/10 bg-[#0b0b0b] px-4 py-2 text-sm font-medium text-[#E5E7EB] transition-all hover:border-[#1E40AF] hover:bg-[#1E40AF]/10 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <Download className="h-4 w-4" />
+          Export to Excel ({pods.length})
+        </button>
       </div>
 
       {/* Error State */}

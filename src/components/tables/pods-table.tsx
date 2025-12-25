@@ -8,12 +8,13 @@ import {
   flexRender,
   ColumnFiltersState,
 } from "@tanstack/react-table";
-import { ChevronUp, ChevronDown } from "lucide-react";
+import { ChevronUp, ChevronDown, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 import { useDebounce } from "@/hooks/use-debounce";
 import { createPodColumns } from "./pods-table-columns";
 import { PodsTableFilters } from "./pods-table-filters";
+import { exportPodsToExcel } from "@/lib/export-utils";
 
 type Status = "ONLINE" | "DEGRADED" | "OFFLINE" | "INVALID";
 type Visibility = "PUBLIC" | "PRIVATE";

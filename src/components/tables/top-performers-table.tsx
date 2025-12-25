@@ -9,13 +9,14 @@ import {
   createColumnHelper,
   type SortingState,
 } from "@tanstack/react-table";
-import { ChevronDown, Copy, Check, HelpCircle } from "lucide-react";
+import { ChevronDown, Copy, Check, HelpCircle, Download } from "lucide-react";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 import { useTopPerformers, type PerformanceSortOption, type TopPerformersParams } from "@/hooks/use-top-performers";
 import { formatStorageValue } from "@/lib/formatters";
 import TableSkeleton from "@/components/skeletons/table-skeleton";
 import { useRouter } from "next/navigation";
 import type { PNodeListItem } from "@/lib/types";
+import { exportTopPerformersToExcel } from "@/lib/export-utils";
 
 interface TopPerformersTableProps {
   isLoading?: boolean;
@@ -217,6 +218,15 @@ export function TopPerformersTable({ isLoading: parentLoading = false }: TopPerf
     }
   };
 
+  const handleExport = () => {
+    if (tableData.length === 0) {
+      alert("No data to export");
+      return;
+    }
+    const validData = tableData.filter((item): item is PNodeListItem & { pubkey: string } => item.pubkey !== null);
+    exportTopPerformersToExcel(validData, sortOptions[sortBy], "top-performers");
+  };
+
   return (
     <div className="rounded-lg border border-white/5 bg-[#0b0b0b] p-6">
       {isLoading ? (
@@ -233,19 +243,30 @@ export function TopPerformersTable({ isLoading: parentLoading = false }: TopPerf
                 Top 10 pods by {sortOptions[sortBy].toLowerCase()}
               </p>
             </div>
-            <div className="relative">
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as PerformanceSortOption)}
-                className="appearance-none rounded-lg border border-white/10 bg-[#0b0b0b] px-4 py-2 pr-10 text-sm font-medium text-[#E5E7EB] transition-all hover:border-[#1E40AF] focus:border-[#1E40AF] focus:outline-none"
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleExport}
+                disabled={tableData.length === 0}
+                className="flex items-center gap-2 rounded-lg border border-white/10 bg-black px-4 py-2 text-sm font-medium text-[#E5E7EB] transition-all hover:border-[#1E40AF] hover:bg-[#1E40AF]/10 disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Export to Excel"
               >
-                {Object.entries(sortOptions).map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9CA3AF]" />
+                <Download className="h-4 w-4" />
+                Export
+              </button>
+              <div className="relative">
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as PerformanceSortOption)}
+                  className="appearance-none rounded-lg border border-white/10 bg-[#0b0b0b] px-4 py-2 pr-10 text-sm font-medium text-[#E5E7EB] transition-all hover:border-[#1E40AF] focus:border-[#1E40AF] focus:outline-none"
+                >
+                  {Object.entries(sortOptions).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9CA3AF]" />
+              </div>
             </div>
           </div>
 
