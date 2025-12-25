@@ -1,5 +1,5 @@
-import type { NetworkStats as NetworkStatsModel } from "../../../prisma/generated/client";
-import { Network as NetworkModel } from "../../../prisma/generated/client";
+import type { NetworkStats as NetworkStatsModel } from "../../../prisma/generated/client/client";
+import { Network as NetworkModel } from "../../../prisma/generated/client/client";
 import type { Network, NetworkStats } from "../types";
 
 export function mapNetworkToDto(network: NetworkModel): Network {

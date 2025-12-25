@@ -11,7 +11,7 @@ let prismaInstance: PrismaClient | null = null;
 
 function createPrismaClient(): PrismaClient {
   if (!process.env.DIRECT_URL) {
-    console.warn('[Prisma] DIRECT_URL not set - client will fail at runtime if database access is needed');
+    console.warn('[Prisma] DIRECT_URL not set - client will fail at runtime if database access is needed'); //@ts-ignore
     return new PrismaClient() as any;
   }
 

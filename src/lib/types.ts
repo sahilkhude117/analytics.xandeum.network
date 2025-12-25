@@ -1,4 +1,4 @@
-import { Status } from "../../prisma/generated/client";
+import { Status } from "../../prisma/generated/client/client";
 
 export interface ApiSuccessResponse<T> {
   success: true;
