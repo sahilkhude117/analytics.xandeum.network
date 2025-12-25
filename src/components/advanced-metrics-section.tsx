@@ -70,12 +70,12 @@ export function AdvancedMetricsSection({
           <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
             <KpiCard 
               title="Avg CPU %" 
-              value={`${Math.round(avgCpu)}%`} 
+              value={`${avgCpu.toFixed(2)}%`} 
               tooltip={`${avgCpu.toFixed(2)}% average CPU usage`}
             />
             <KpiCard 
               title="Avg RAM Usage %" 
-              value={`${Math.round(avgRam)}%`} 
+              value={`${avgRam.toFixed(2)}%`} 
               tooltip={`${avgRam.toFixed(2)}% average RAM usage`}
             />
             <KpiCard title="Total Active Streams" value={totalStreams.toLocaleString()} />

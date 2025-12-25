@@ -224,8 +224,8 @@ export default function NetworkPage() {
     }
     
     return {
-      avgCpu: Math.round(networkData.advancedMetrics.avgCpu),
-      avgRam: Math.round(networkData.advancedMetrics.avgRam),
+      avgCpu: networkData.advancedMetrics.avgCpu,
+      avgRam: networkData.advancedMetrics.avgRam,
       totalStreams: networkData.advancedMetrics.totalStreams,
       totalPacketsSent: parseInt(networkData.advancedMetrics.totalPacketsSent) || 0,
       totalPacketsReceived: parseInt(networkData.advancedMetrics.totalPacketsReceived) || 0,
@@ -325,6 +325,14 @@ export default function NetworkPage() {
                 title="Health Score"
                 value={`${networkData.healthScore}%`}
                 valueColor={getHealthColor(networkData.healthScore)}
+                infoTooltip={`Network Health Score Calculation (0-100 points):
+• Online Status: 40 pts (seen in last 5 min)
+• Last Seen: 20 pts (based on recency)
+• Storage Health: 15 pts (optimal usage)
+• CPU Usage: 10 pts (public nodes only)
+• Uptime: 15 pts (stability)
+
+Score ≥90: Excellent | 70-89: Good | 50-69: Fair | 30-49: Poor | <30: Critical`}
               />
             </>
           ) : (

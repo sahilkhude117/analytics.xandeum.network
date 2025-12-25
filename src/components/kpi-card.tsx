@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { HelpCircle } from "lucide-react";
+import { HelpCircle, Info } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -18,9 +18,10 @@ interface KpiCardProps {
   className?: string;
   tooltip?: string; // Full precision value for hover
   valueColor?: string; // Custom color for the value
+  infoTooltip?: string; // Info tooltip for title (right-aligned)
 }
 
-export function KpiCard({ title, value, subtitle, trend, className, tooltip, valueColor }: KpiCardProps) {
+export function KpiCard({ title, value, subtitle, trend, className, tooltip, valueColor, infoTooltip }: KpiCardProps) {
   return (
     <div
       className={cn(
@@ -28,8 +29,26 @@ export function KpiCard({ title, value, subtitle, trend, className, tooltip, val
         className
       )}
     >
-      <div className="mb-2 text-xs font-medium uppercase tracking-wide text-[#6B7280]">
-        {title}
+      <div className="mb-2 flex items-center justify-between">
+        <div className="text-xs font-medium uppercase tracking-wide text-[#6B7280]">
+          {title}
+        </div>
+        {infoTooltip && (
+          <TooltipProvider delayDuration={100}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Info className="h-3.5 w-3.5 text-[#60A5FA] hover:text-[#93C5FD] cursor-help transition-colors" />
+              </TooltipTrigger>
+              <TooltipContent side="top" align="end" className="max-w-sm">
+                <div className="text-xs space-y-1">
+                  {infoTooltip.split('\n').map((line, i) => (
+                    <p key={i} className={line.startsWith('•') ? 'ml-2' : ''}>{line}</p>
+                  ))}
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
       </div>
       <div className="flex items-center gap-2">
         <div 

@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Github, LucideGithub, Search } from "lucide-react";
+import { Github, LucideGithub } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { GlobalSearch } from "@/components/global-search";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -67,13 +67,8 @@ export function Navbar() {
         {/* Right Section */}
         <div className="flex items-center gap-4">
           {/* Search Bar */}
-          <div className="relative hidden lg:block">
-            <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-[#6B7280]" />
-            <Input
-              type="search"
-              placeholder="search by pubkey, ip address..."
-              className="h-11 w-72 border-white/10 bg-white/5 pl-10 text-base text-[#E5E7EB] placeholder:text-[#6B7280] focus:border-white/20 focus:bg-white/10"
-            />
+          <div className="hidden lg:block">
+            <GlobalSearch />
           </div>
 
           {/* GitHub Link */}

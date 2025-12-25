@@ -139,6 +139,13 @@ export default function Home() {
     return '#6B7280'; // Gray
   };
 
+  const getHealthColor = (score: number) => {
+    if (score >= 80) return '#22C55E'; // Green
+    if (score >= 60) return '#FACC15'; // Yellow
+    if (score >= 40) return '#F97316'; // Orange
+    return '#EF4444'; // Red
+  };
+
   const lastUpdatedText = useMemo(() => {
     if (lastRefreshTime) {
       return formatDistanceToNow(lastRefreshTime, { addSuffix: true });
@@ -162,8 +169,11 @@ export default function Home() {
               className="h-2 w-2 rounded-full" 
               style={{ backgroundColor: networkData ? getHealthStatusColor(networkData.healthScore) : '#6B7280' }}
             />
-            <span className="text-sm font-semibold text-[#E5E7EB]">
-              Network Status: {networkData ? getHealthStatusText(networkData.healthScore) : 'Unknown'}
+            <span className="text-sm font-semibold">
+              <span className="text-[#E5E7EB]">Network Status: </span>
+              <span style={{ color: networkData ? getHealthStatusColor(networkData.healthScore) : '#6B7280' }}>
+                {networkData ? getHealthStatusText(networkData.healthScore) : 'Unknown'}
+              </span>
             </span>
           </div>
           <button
@@ -217,6 +227,15 @@ export default function Home() {
             <KpiCard
               title="Health Score"
               value={`${networkData.healthScore}%`}
+              valueColor={getHealthColor(networkData.healthScore)}
+              infoTooltip={`Network Health Score Calculation (0-100 points):
+• Online Status: 40 pts (seen in last 5 min)
+• Last Seen: 20 pts (based on recency)
+• Storage Health: 15 pts (optimal usage)
+• CPU Usage: 10 pts (public nodes only)
+• Uptime: 15 pts (stability)
+
+Score ≥90: Excellent | 70-89: Good | 50-69: Fair | 30-49: Poor | <30: Critical`}
             />
           </>
         ) : (
