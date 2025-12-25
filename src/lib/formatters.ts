@@ -1,10 +1,66 @@
 export const formatUptime = (seconds: number): string => {
   const days = Math.floor(seconds / 86400);
   const hours = Math.floor((seconds % 86400) / 3600);
-  if (days > 0) return `${days}d ${hours}h`;
   const minutes = Math.floor((seconds % 3600) / 60);
-  if (hours > 0) return `${hours}h ${minutes}m`;
-  return `${minutes}m`;
+  
+  if (days > 0) {
+    return `${days}d ${hours}h`;
+  }
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+  if (minutes > 0) {
+    return `${minutes}m`;
+  }
+  return `${seconds}s`;
+};
+
+export const formatStorage = (bytes: bigint | string | number): { display: string; full: string; unit: string } => {
+  let bytesNum: number;
+  
+  if (typeof bytes === 'string') {
+    if (bytes.includes('.')) {
+      bytesNum = parseFloat(bytes);
+    } else {
+      bytesNum = Number(BigInt(bytes));
+    }
+  } else if (typeof bytes === 'bigint') {
+    bytesNum = Number(bytes);
+  } else {
+    bytesNum = bytes;
+  }
+  
+  const TB = 1024 ** 4;
+  const GB = 1024 ** 3;
+  
+  // Convert to TB
+  const tbValue = bytesNum / TB;
+  
+  // If less than 0.1 TB, show in GB
+  if (tbValue < 0.1) {
+    const gbValue = bytesNum / GB;
+    return {
+      display: gbValue.toFixed(2),
+      full: gbValue.toFixed(10).replace(/\.?0+$/, ''),
+      unit: 'GB'
+    };
+  }
+  
+  return {
+    display: tbValue.toFixed(2),
+    full: tbValue.toFixed(10).replace(/\.?0+$/, ''),
+    unit: 'TB'
+  };
+};
+
+export const formatStorageValue = (bytes: bigint | string | number): string => {
+  const formatted = formatStorage(bytes);
+  return `${formatted.display} ${formatted.unit}`;
+};
+
+export const getFullStorageValue = (bytes: bigint | string | number): string => {
+  const formatted = formatStorage(bytes);
+  return `${formatted.full} ${formatted.unit}`;
 };
 
 export const formatRelativeTime = (date: Date): string => {

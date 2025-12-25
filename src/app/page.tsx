@@ -1,30 +1,84 @@
 
+"use client";
+
 import { KpiCard } from "@/components/kpi-card";
 import { StorageUtilizationChart } from "@/components/charts/storage-utilization-chart";
 import { NodeStatusChart } from "@/components/charts/node-status-chart";
 import { TopPerformersTable } from "@/components/tables/top-performers-table";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, RefreshCw } from "lucide-react";
 import KpiCardSkeleton from "@/components/skeletons/kpi-card-skeleton";
 import ChartSkeleton from "@/components/skeletons/chart-skeleton";
+import { useNetworkData } from "@/hooks/use-network-data";
+import { useState, useMemo } from "react";
+import type { NetworkStats, NetworkHybridResponse } from "@/lib/types";
+import { formatDistanceToNow } from "date-fns";
+import { formatUptime, formatStorageValue, getFullStorageValue } from "@/lib/formatters";
+import { apiClient } from "@/lib/api-client";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function Home() {
-  const isLoading = false;
+  const [lastRefreshTime, setLastRefreshTime] = useState<Date | null>(null);
+  const queryClient = useQueryClient();
+  
+  const { data, isLoading, isFetching } = useNetworkData();
 
-  // Mock data
-  const networkData = {
-    totalPods: 226,
-    onlinePods: 190,
-    storageCommitted: 172.6, // TB
-    storageUsed: 108.4, // TB
-    avgCommittedPerPod: 0.76, // TB
-    avgUptime: 98.4, // percentage
-    healthScore: 94, // out of 100
+  const handleRefresh = async () => {
+    setLastRefreshTime(new Date());
+    const freshData = await apiClient.getNetworkStats(true);
+    queryClient.setQueryData(["network"], freshData);
   };
 
-  const storageUsedPercentage = (
-    (networkData.storageUsed / networkData.storageCommitted) *
-    100
-  ).toFixed(1);
+  const networkData = useMemo(() => {
+    if (!data) return null;
+
+    const isHybrid = "dataSource" in data;
+    
+    if (isHybrid) {
+      const hybrid = data as NetworkHybridResponse;
+      const live = hybrid.liveMetrics;
+      const detailed = hybrid.detailedMetrics;
+      
+      return {
+        totalPods: live?.totalPNodes ?? 0,
+        onlinePods: live?.onlinePNodes ?? 0,
+        totalStorageCommitted: live?.totalStorageCommitted ?? "0",
+        totalStorageUsed: live?.totalStorageUsed ?? "0",
+        avgStorageUsagePercent: live?.avgStorageUsagePercent ?? 0,
+        avgUptime: live?.avgUptime ?? 0,
+        healthScore: live?.networkHealthScore ?? 0,
+        timestamp: live?.timestamp ?? new Date().toISOString(),
+      };
+    } else {
+      const stats = data as NetworkStats;
+      return {
+        totalPods: stats.totalPNodes,
+        onlinePods: stats.onlinePNodes,
+        totalStorageCommitted: stats.totalStorageCommitted,
+        totalStorageUsed: stats.totalStorageUsed,
+        avgStorageUsagePercent: stats.avgStorageUsagePercent,
+        avgUptime: stats.avgUptime,
+        healthScore: stats.networkHealthScore,
+        timestamp: stats.timestamp,
+      };
+    }
+  }, [data]);
+
+  const avgStoragePerPod = useMemo(() => {
+    if (!networkData || networkData.totalPods === 0) return "0";
+    const committed = BigInt(networkData.totalStorageCommitted);
+    const avgBytes = Number(committed) / networkData.totalPods;
+    return avgBytes.toString();
+  }, [networkData]);
+
+  const lastUpdatedText = useMemo(() => {
+    if (lastRefreshTime) {
+      return formatDistanceToNow(lastRefreshTime, { addSuffix: true });
+    }
+    if (networkData?.timestamp) {
+      return formatDistanceToNow(new Date(networkData.timestamp), { addSuffix: true });
+    }
+    return "moments ago";
+  }, [lastRefreshTime, networkData?.timestamp]);
 
   return (
     <main className="container mx-auto px-6 py-8">
@@ -40,9 +94,18 @@ export default function Home() {
               Network Status: Healthy
             </span>
           </div>
+          <button
+            onClick={handleRefresh}
+            disabled={isFetching}
+            className="ml-auto flex items-center gap-2 rounded-lg border border-white/10 bg-[#0b0b0b] px-4 py-2 text-sm font-medium text-[#E5E7EB] transition-all hover:border-[#1E40AF] hover:bg-[#1E40AF]/10 disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Refresh network data"
+          >
+            <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
+            <span>Refresh</span>
+          </button>
         </div>
         <p className="mt-1 text-sm text-[#9CA3AF]">
-          Devnet · Updated moments ago
+          Devnet · Updated {lastUpdatedText}
         </p>
       </div>
 
@@ -50,7 +113,7 @@ export default function Home() {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         {isLoading ? (
           Array.from({ length: 6 }).map((_, i) => <KpiCardSkeleton key={i} />)
-        ) : (
+        ) : networkData ? (
           <>
             <KpiCard
               title="Total Pods"
@@ -59,29 +122,35 @@ export default function Home() {
             />
             <KpiCard
               title="Storage Committed"
-              value={`${networkData.storageCommitted} TB`}
-              trend={{ value: "6.2% (7d)", isPositive: true }}
+              value={formatStorageValue(networkData.totalStorageCommitted)}
+              tooltip={getFullStorageValue(networkData.totalStorageCommitted)}
             />
             <KpiCard
               title="Storage Used"
-              value={`${networkData.storageUsed} TB`}
-              subtitle={`${storageUsedPercentage}% utilized`}
+              value={formatStorageValue(networkData.totalStorageUsed)}
+              tooltip={getFullStorageValue(networkData.totalStorageUsed)}
+              subtitle={`${networkData.avgStorageUsagePercent > 0 ? networkData.avgStorageUsagePercent.toFixed(2) : '< 0.01'}% utilized`}
             />
             <KpiCard
               title="Avg Storage Per Pod"
-              value={`${networkData.avgCommittedPerPod} TB`}
+              value={formatStorageValue(avgStoragePerPod)}
+              tooltip={getFullStorageValue(avgStoragePerPod)}
               subtitle="committed"
             />
             <KpiCard
               title="Avg Uptime"
-              value={`${networkData.avgUptime}%`}
-              trend={{ value: "0.3% (7d)", isPositive: true }}
+              value={formatUptime(networkData.avgUptime)}
+              subtitle={`${networkData.avgUptime.toLocaleString()} seconds`}
             />
             <KpiCard
               title="Health Score"
               value={`${networkData.healthScore}%`}
             />
           </>
+        ) : (
+          <div className="col-span-full text-center text-[#9CA3AF]">
+            No data available
+          </div>
         )}
       </div>
 

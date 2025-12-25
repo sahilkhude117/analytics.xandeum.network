@@ -1,4 +1,11 @@
 import { cn } from "@/lib/utils";
+import { HelpCircle } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface KpiCardProps {
   title: string;
@@ -9,9 +16,10 @@ interface KpiCardProps {
     isPositive?: boolean;
   };
   className?: string;
+  tooltip?: string; // Full precision value for hover
 }
 
-export function KpiCard({ title, value, subtitle, trend, className }: KpiCardProps) {
+export function KpiCard({ title, value, subtitle, trend, className, tooltip }: KpiCardProps) {
   return (
     <div
       className={cn(
@@ -22,7 +30,23 @@ export function KpiCard({ title, value, subtitle, trend, className }: KpiCardPro
       <div className="mb-2 text-xs font-medium uppercase tracking-wide text-[#6B7280]">
         {title}
       </div>
-      <div className="text-3xl font-bold text-[#E5E7EB]">{value}</div>
+      <div className="flex items-center gap-2">
+        <div className="text-3xl font-bold text-[#E5E7EB]">
+          {value}
+        </div>
+        {tooltip && (
+          <TooltipProvider delayDuration={100}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <HelpCircle className="h-4 w-4 text-[#6B7280] hover:text-[#9CA3AF] cursor-help transition-colors" />
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-xs">
+                <p className="text-xs font-mono">{tooltip}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
+      </div>
       {subtitle && (
         <div className="mt-1 text-sm text-[#9CA3AF]">{subtitle}</div>
       )}
