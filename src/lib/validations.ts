@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { Status } from "@prisma/client";
+import { Status } from "../../lib/generated/prisma/enums";
 
 // API Query Schemas
 export const NetworkQuerySchema = z.object({

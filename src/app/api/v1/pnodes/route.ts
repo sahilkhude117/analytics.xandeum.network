@@ -4,7 +4,7 @@ import { withCache } from "@/lib/cache";
 import { successResponse, handleError, buildCacheKey } from "@/lib/api";
 import { PNodeListQuerySchema } from "@/lib/validations";
 import type { PNodeListItem, PaginatedResponse } from "@/lib/types";
-import { Prisma, Status } from "@prisma/client";
+import { Prisma, Status } from "../../../../../lib/generated/prisma/client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
