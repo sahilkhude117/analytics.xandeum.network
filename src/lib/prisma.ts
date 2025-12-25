@@ -1,4 +1,4 @@
-import { PrismaClient } from "../../prisma/generated/client";
+import { PrismaClient } from "../../prisma/generated/client/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import pg from "pg";
 
@@ -8,28 +8,14 @@ const globalForPrisma = globalThis as unknown as {
 };
 
 let prismaInstance: PrismaClient | null = null;
-let initError: Error | null = null;
 
-function getPrismaClient(): PrismaClient {
-  if (prismaInstance) {
-    return prismaInstance;
-  }
-
-  // If we already tried and failed, throw the same error
-  if (initError) {
-    throw initError;
+function createPrismaClient(): PrismaClient {
+  if (!process.env.DIRECT_URL) {
+    console.warn('[Prisma] DIRECT_URL not set - client will fail at runtime if database access is needed');
+    return new PrismaClient() as any;
   }
 
   try {
-    if (!process.env.DIRECT_URL) {
-      if (process.env.NODE_ENV === 'production' && !process.env.DIRECT_URL) {
-        console.warn('[Prisma] DIRECT_URL not available during build, deferring initialization');
-        prismaInstance = new PrismaClient() as any;
-        return prismaInstance;
-      }
-      throw new Error("[Prisma] DIRECT_URL is required");
-    }
-
     if (!globalForPrisma.pool) {
       globalForPrisma.pool = new pg.Pool({
         connectionString: process.env.DIRECT_URL,
@@ -40,17 +26,23 @@ function getPrismaClient(): PrismaClient {
     }
 
     const adapter = new PrismaPg(globalForPrisma.pool);
-    prismaInstance = new PrismaClient({ adapter });
+    return new PrismaClient({ adapter });
+  } catch (error) {
+    console.error('[Prisma] Failed to initialize client:', error);
+    throw error;
+  }
+}
+
+function getPrismaClient(): PrismaClient {
+  if (!prismaInstance) {
+    prismaInstance = createPrismaClient();
     
     if (process.env.NODE_ENV !== "production") {
       globalForPrisma.prisma = prismaInstance;
     }
-
-    return prismaInstance;
-  } catch (error) {
-    initError = error as Error;
-    throw error;
   }
+  
+  return prismaInstance;
 }
 
 export const prisma = new Proxy({} as PrismaClient, {
